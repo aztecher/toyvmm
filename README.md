@@ -1,6 +1,6 @@
 # ToyVMM (Toy Virtual Machine Monitor)
 
-[JP](./README_ja.md)
+[Japanese README](./README_ja.md)
 
 ToyVMM is a project being developed for the purpose of learning virtualization technology.  
 ToyVMM aims to accomplish the following
@@ -46,7 +46,7 @@ sudo rm -rf target
 $ make run_container
 ```
 
-## Test
+### Test
 
 Running `make test` will run `cargo test` on the development environment, and running `make test_container` will run the test inside the container.
 Since this test assumes that `/dev/kvm` is used, `make test` requires the existence of `/dev/kvm` and sudo privileges. Also, when testing on containers, `/dev/kvm` is mounted and the test is executed.
