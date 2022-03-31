@@ -1,0 +1,11 @@
+dist: focal
+sudo: true
+addons:
+  apt:
+    packages:
+      - qemu-kvm
+language: rust
+rust:
+  - 1.57.0
+script:
+  - sudo -E env "PATH=$PATH" cargo test -- --nocapture
