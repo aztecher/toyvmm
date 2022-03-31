@@ -1,5 +1,9 @@
 # ToyVMM (Toy Virtual Machine Monitor)
 
+[![Build Status](https://app.travis-ci.com/aztecher/toyvmm.svg?branch=main)](https://app.travis-ci.com/aztecher/toyvmm)
+
+## Overview
+
 [Japanese README](./README_ja.md)
 
 ToyVMM is a project being developed for the purpose of learning virtualization technology.  
