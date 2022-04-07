@@ -20,14 +20,17 @@ In addition, Docker installation is required since the code testing and executio
 
 ## Book
 
-Comming Soon...  
+[Book](https://aztecher.github.io/) is now available!
+
+As we expand the implementation of ToyVMM, we plan to enhance the contents of the book as well.
+If you find any mistakes or my misunderstandings in the documentation, please feel free to submit an issue to the [toyvmm-book](https://github.com/aztecher/toyvmm-book) repository.
 
 ## Development
 
 ### Run
 
 Running `make run` executes `cargo run` on the development environment, and running `make run_container` executes it inside the container.
-Currently running code equivalent to [kvm_ioctls' example](https://docs.rs/kvm-ioctls/latest/kvm_ioctls/#example---running-a-vm-on-x86_64)
+Currently running code equivalent to the example of LVM article 「[Using the KVM API](https://lwn.net/Articles/658511/)」and similar to [kvm_ioctls' example](https://docs.rs/kvm-ioctls/latest/kvm_ioctls/#example---running-a-vm-on-x86_64)
 
 ```bash
 # Execute on development environment
@@ -62,4 +65,3 @@ $ make test
 # Execute inside container
 make test_container
 ```
-

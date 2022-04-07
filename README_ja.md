@@ -17,14 +17,17 @@ ToyVMMは以下を達成することを目的としています
 
 ## Book
 
-Comming Soon..
+[Book](https://aztecher.github.io/)を作成しました。
+
+ToyVMMの実装拡張とともに、bookの内容も拡充していく予定です
+もし内容に間違いを含んでいる場合は、気軽に[toyvmm-book](https://github.com/aztecher/toyvmm-book)にissueを起票してください
 
 ## Development
 
 ### Run
 
 `make run`を実行すると開発環境上で`cargo run`を実施し、`make run_container`を実行することでコンテナ内部で実行します。
-現在は、[kvm_ioctlsのExample](https://docs.rs/kvm-ioctls/latest/kvm_ioctls/#example---running-a-vm-on-x86_64)と同等のコードを実行している
+現在は、LWNの「[Using the KVM API](https://lwn.net/Articles/658511/)」と同等のコードを実行しており、[kvm_ioctlsのExample](https://docs.rs/kvm-ioctls/latest/kvm_ioctls/#example---running-a-vm-on-x86_64)とも類似のコードになっています
 
 ```bash
 $ make run
