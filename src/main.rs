@@ -15,8 +15,67 @@ use toyvmm::kvm::{
     },
 };
 use vmm_sys_util::tempfile::TempFile;
+use clap::{Arg, App};
+use nix::unistd::getuid;
+
+const _ZERO_PAGE_START: u64 = 0x7000;
+
+const DEFAULT_VMLINUX_PATH: &str = "vmlinux.bin";
+const DEFAULT_CMDLINE_ARGS: &str = "console=ttyS0 noapic noacpi reboot=k panic=1 pci=off nomodule";
 
 fn main() {
+    let app = App::new("ToyVMM is a hypervisor for learning virtualization technology")
+        .version("0.0.1")
+        .author("aztecher <mikiyaf.business@gmail.com>")
+        .subcommand(App::new("lwn_sample")
+            .about("example of LWN article sample"))
+        .subcommand(App::new("boot_kernel")
+            .about("example of booting linux kernel (custom)")
+            .arg(Arg::new("kernel-file")
+                .short('k')
+                .value_name("FILE"))
+            .arg(Arg::new("initrd-file")
+                .short('i')
+                .value_name("FILE"))
+            .arg(Arg::new("boot-cmdline")
+                .short('c')
+                .value_name("BOOT_CMD_LINE")))
+        .get_matches();
+
+    let verify_root = || if !getuid().is_root() {
+        println!("Only root user can run this command");
+        std::process::exit(1);
+    };
+
+    if let Some(ref _matches) = app.subcommand_matches("lwn_sample") {
+        verify_root();
+        lwn_kvm_api_sample();
+    }
+    if let Some(ref matches) = app.subcommand_matches("boot_kernel") {
+        verify_root();
+        let kernel_image_path = match matches.value_of("kernel-file") {
+            Some(p) => p,
+            None => DEFAULT_VMLINUX_PATH,
+        };
+        let mut kernel_file = std::fs::File::open(kernel_image_path).unwrap();
+        let boot_args = match matches.value_of("boot-cmdline") {
+            Some(cmd) => cmd,
+            None => DEFAULT_CMDLINE_ARGS,
+        };
+        let mut initrd_file = match matches.value_of("initrd-file") {
+            Some(p) => {
+                let initrd_file = std::fs::File::open(p).unwrap();
+                Some(initrd_file)
+            }
+            None => None,
+        };
+        let mut boot_cmdline = linux_loader::cmdline::Cmdline::new(0x10000);
+        boot_cmdline.insert_str(boot_args).unwrap();
+        toyvmm::builder::boot_kernel(&mut kernel_file, &mut initrd_file, &mut boot_cmdline)
+    }
+}
+
+fn lwn_kvm_api_sample() {
     let kvm = Kvm::new().expect("Failed to open /dev/kvm or unexpected error");
     let mut vm = Vm::new(&kvm).expect("Failed to setup vm");
 

@@ -1,5 +1,15 @@
+pub mod builder;
+pub mod vmm;
+pub mod vm_resources;
 pub mod kvm;
 pub mod utils;
+pub mod arch;
+pub mod devices;
+
+#[derive(Debug)]
+pub enum Error {
+    KernelFile(std::io::Error),
+}
 
 #[cfg(test)]
 mod tests {

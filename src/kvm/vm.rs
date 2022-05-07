@@ -8,11 +8,18 @@ use kvm_ioctls::{
     Kvm,
 };
 use kvm_bindings::{
+    CpuId,
+    kvm_pit_config,
     kvm_userspace_memory_region,
     KVM_MEM_LOG_DIRTY_PAGES,
+    KVM_MAX_CPUID_ENTRIES,
+    KVM_PIT_SPEAKER_DUMMY,
 };
-use vm_memory::{Address, GuestMemory, GuestMemoryRegion};
-use crate::kvm::memory::GuestMemoryMmap;
+use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryRegion};
+use crate::{
+    arch,
+    kvm::memory::GuestMemoryMmap,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -25,16 +32,26 @@ pub enum Error {
     SetUserMemoryRegion(kvm_ioctls::Error),
     // The number of configured slots is bigger than maximum
     NotEnoughMemorySlots,
+    // Cannot configure the microvm
+    VmSetup(kvm_ioctls::Error),
 }
 
 pub struct Vm {
-    fd: VmFd
+    fd: VmFd,
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    supported_cpuid: CpuId,
 }
 
 pub type Result<T> = result::Result<T, Error>;
 
 impl Vm {
     pub fn new(kvm: &Kvm) -> Result<Self> {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        let supported_cpuid = kvm
+            .get_supported_cpuid(KVM_MAX_CPUID_ENTRIES)
+            .map_err(Error::VmFd)?;
+
         /* kvm.create_vm() : create VM fd using KVM of type 0
          * file descriptor : kvm_ioctls::Kvm::kvm.as_raw_fd()
          *   - kvm_ioctls::Kvm::kvm has type std::fs::File
@@ -52,7 +69,26 @@ impl Vm {
          * file descriptor is automatically closed when dropping.
          */
         let vm_fd = kvm.create_vm().map_err(Error::VmFd)?;
-        Ok(Vm {fd: vm_fd})
+        Ok(Vm {
+            fd: vm_fd,
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            supported_cpuid,
+        })
+    }
+
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    pub fn supported_cpuid(&self) -> &CpuId {
+        &self.supported_cpuid
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub fn setup_irqchip(&self) -> Result<()> {
+        self.fd.create_irq_chip().map_err(Error::VmSetup)?;
+        let pit_config = kvm_pit_config {
+            flags: KVM_PIT_SPEAKER_DUMMY,
+            ..Default::default()
+        };
+        self.fd.create_pit2(pit_config).map_err(Error::VmSetup)
     }
 
     pub fn set_kvm_memory_regions(
@@ -120,6 +156,10 @@ impl Vm {
             return Err(Error::NotEnoughMemorySlots);
         }
         self.set_kvm_memory_regions(guest_mem, track_dirty_pages)?;
+        #[cfg(target_arch = "x86_64")]
+        self.fd
+            .set_tss_address(arch::x86_64::KVM_TSS_ADDRESS as usize)
+            .map_err(Error::VmSetup)?;
         Ok(())
     }
 
@@ -132,10 +172,19 @@ impl Vm {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::kvm::memory::tests::create_anon_guest_memory;
 
     pub(crate) fn setup_vm() -> Vm {
         let kvm = Kvm::new().expect("Failed to open /dev/kvm or unexpected error");
         Vm::new(&kvm).unwrap()
+    }
+
+    pub(crate) fn setup_vm_with_mem(mem_size: usize) ->(Vm, GuestMemoryMmap) {
+        let kvm = Kvm::new().expect("Faled to open /dev/kvm or unexpected error");
+        let gm = create_anon_guest_memory(&[(GuestAddress(0), mem_size)], false)
+            .unwrap();
+        let mut vm = Vm::new(&kvm).expect("Cannot create new vm");
+        (vm, gm)
     }
 
     #[test]

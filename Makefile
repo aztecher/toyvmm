@@ -4,6 +4,8 @@ CARGO := cargo
 
 IMAGE_TAG := 0.0.1
 DOCKER_IMAGE := aztecher/toyvmm:${IMAGE_TAG}
+KERNEL_FILE := vmlinux.bin
+INITRD_FILE := initrd.img
 
 DEFAULT_TARGET := help
 
@@ -17,15 +19,18 @@ all: $(ALL_TARGET) ## Make all files
 docker-image: ## Build docker image
 	docker build -t ${DOCKER_IMAGE} .
 
-run: ## Execute cargo run
-	sudo -E cargo run
+run_lwn: ## Execute LWN sample
+	sudo -E cargo run -- lwn_sample
 	sudo rm -rf target
 
-run_container: docker-image
+run_lwn_container: docker-image
 	docker run --rm --device=/dev/kvm \
 		--security-opt seccomp=unconfined \
 		--volume `pwd`:/toyvmm -it ${DOCKER_IMAGE} \
-		sh -c 'cd toyvmm; cargo run; rm -rf target'
+		sh -c 'cd toyvmm; cargo run -- lwn_sample; rm -rf target'
+
+run_linux: ## Execute Linux kernel (Require vmlinux.bin, initrd.img in this directory)
+	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE}
 
 test: ## Execute cargo test
 	sudo -E cargo test -- --nocapture

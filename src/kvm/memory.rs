@@ -197,4 +197,14 @@ pub mod tests {
         let guest_memory = create_guest_memory(&regions, false).unwrap();
         println!("guest_memory = {:?}", guest_memory);
     }
+
+    pub fn create_anon_guest_memory(
+        regions: &[(GuestAddress, usize)],
+        track_dirty_pages: bool,
+    ) -> std::result::Result<GuestMemoryMmap, Error> {
+        create_guest_memory(
+            &regions.iter().map(|r| (None, r.0, r.1)).collect::<Vec<_>>(),
+            track_dirty_pages,
+        )
+    }
 }
