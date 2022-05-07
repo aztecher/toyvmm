@@ -17,7 +17,10 @@ ToyVMMは以下を達成することを目的としています
 
 ## Book
 
-Comming Soon..
+[Book](https://aztecher.github.io/)を作成しました。
+
+ToyVMMの実装拡張とともに、bookの内容も拡充していく予定です
+もし内容に間違いを含んでいる場合は、気軽に[toyvmm-book](https://github.com/aztecher/toyvmm-book)にissueを起票してください
 
 ## Development
 

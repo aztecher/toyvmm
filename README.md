@@ -1,5 +1,9 @@
 # ToyVMM (Toy Virtual Machine Monitor)
 
+[![Build Status](https://app.travis-ci.com/aztecher/toyvmm.svg?branch=main)](https://app.travis-ci.com/aztecher/toyvmm)
+
+## Overview
+
 [Japanese README](./README_ja.md)
 
 ToyVMM is a project being developed for the purpose of learning virtualization technology.  
@@ -16,12 +20,16 @@ In addition, Docker installation is required since the code testing and executio
 
 ## Book
 
-Comming Soon...  
+[Book](https://aztecher.github.io/) is now available!
+
+As we expand the implementation of ToyVMM, we plan to enhance the contents of the book as well.
+If you find any mistakes or my misunderstandings in the documentation, please feel free to submit an issue to the [toyvmm-book](https://github.com/aztecher/toyvmm-book) repository.
 
 ## Development
 
 ### Run LWN article example
 
+`
 Running `make run_lwn` executes `cargo run` on the development environment, and running `make run_lwn_container` executes it inside the container.
 Currently running code equivalent to [kvm_ioctls' example](https://docs.rs/kvm-ioctls/latest/kvm_ioctls/#example---running-a-vm-on-x86_64)
 
@@ -284,4 +292,3 @@ $ make test
 # Execute inside container
 make test_container
 ```
-
