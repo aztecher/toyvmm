@@ -46,7 +46,7 @@ Recieved I/O out exit. Address: 0x3f8, Data(hex): 0xa
 sudo rm -rf target
 ```
 
-### Run linux kernel with initrd (no rootfs)
+### Run linux kernel with initrd
 
 まず、`vmlinux.bin`と`initrd.img`を、toyvmmのワーキングディレクトリに配置してください
 
@@ -61,15 +61,19 @@ git clone https://github.com/marcov/firecracker-initrd.git
 cd firecracker-initrd
 bash ./build.sh
 # After above commands, initrd.img file wil be located on build/initrd.img
+# So, please move it to the working directory of toyvmm.
 cp build/initrd.img <TOYVMM WORKING DIRECTORY>
 ```
 
-`make run_linux`コマンドを実行すると、Linux kernelを起動することができます（ただし、起動するだけでそれ以上のことは現状できません）
+`make run_linux`コマンドを実行すると、Linux kernelを起動することができます！
+起動後はroot/rootでログインできコマンド実行等も行えます
 
 ```bash
 $ make run_linux
 sudo -E cargo run -- boot_kernel -k vmlinux.bin -i initrd.img
 ...
+    Finished dev [unoptimized + debuginfo] target(s) in 0.04s
+     Running `target/debug/toyvmm boot_kernel -k vmlinux.bin -i initrd.img`
 [    0.000000] Linux version 4.14.174 (@57edebb99db7) (gcc version 7.5.0 (Ubuntu 7.5.0-3ubuntu1~18.04)) #2 SMP Wed Jul 14 11:47:24 UTC 2021
 [    0.000000] Command line: console=ttyS0 noapic noacpi reboot=k panic=1 pci=off nomodule
 [    0.000000] CPU: vendor_id 'TOYVMMTOYVMM' unknown, using generic init.
@@ -138,102 +142,102 @@ sudo -E cargo run -- boot_kernel -k vmlinux.bin -i initrd.img
 [    0.004000] Console: colour dummy device 80x25
 [    0.004000] console [ttyS0] enabled
 [    0.004000] tsc: Detected 1797.917 MHz processor
-[    0.012160] Calibrating delay loop (skipped) preset value.. 3595.83 BogoMIPS (lpj=7191668)
-[    0.020071] pid_max: default: 32768 minimum: 301
-[    0.028913] Security Framework initialized
-[    0.036369] SELinux:  Initializing.
-[    0.049804] Dentry cache hash table entries: 16384 (order: 5, 131072 bytes)
-[    0.058110] Inode-cache hash table entries: 8192 (order: 4, 65536 bytes)
-[    0.064245] Mount-cache hash table entries: 512 (order: 0, 4096 bytes)
-[    0.072207] Mountpoint-cache hash table entries: 512 (order: 0, 4096 bytes)
-[    0.097996] Last level iTLB entries: 4KB 0, 2MB 0, 4MB 0
-[    0.104069] Last level dTLB entries: 4KB 0, 2MB 0, 4MB 0, 1GB 0
-[    0.112200] Spectre V1 : Mitigation: usercopy/swapgs barriers and __user pointer sanitization
-[    0.120071] Spectre V2 : Mitigation: Full generic retpoline
-[    0.128068] Spectre V2 : Spectre v2 / SpectreRSB mitigation: Filling RSB on context switch
-[    0.136068] Spectre V2 : Enabling Restricted Speculation for firmware calls
-[    0.144094] Spectre V2 : mitigation: Enabling conditional Indirect Branch Prediction Barrier
-[    0.152070] Speculative Store Bypass: Mitigation: Speculative Store Bypass disabled via prctl and seccomp
-[    0.160193] MDS: Mitigation: Clear CPU buffers
-[    0.264757] Freeing SMP alternatives memory: 28K
-[    0.291047] smpboot: Max logical packages: 1
-[    0.296075] smpboot: SMP motherboard not detected
-[    0.304069] smpboot: SMP disabled
-[    0.312087] Not enabling interrupt remapping due to skipped IO-APIC setup
-[    0.543466] Performance Events: no PMU driver, software events only.
-[    0.549031] Hierarchical SRCU implementation.
-[    0.562622] smp: Bringing up secondary CPUs ...
-[    0.564009] smp: Brought up 1 node, 1 CPU
-[    0.568009] smpboot: Total of 1 processors activated (3595.83 BogoMIPS)
-[    0.577419] devtmpfs: initialized
-[    0.580508] x86/mm: Memory block size: 128MB
-[    0.589934] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
-[    0.592030] futex hash table entries: 256 (order: 2, 16384 bytes)
-[    0.609081] NET: Registered protocol family 16
-[    0.618664] cpuidle: using governor ladder
-[    0.620010] cpuidle: using governor menu
-[    0.712976] HugeTLB registered 1.00 GiB page size, pre-allocated 0 pages
-[    0.716019] HugeTLB registered 2.00 MiB page size, pre-allocated 0 pages
-[    0.724573] SCSI subsystem initialized
-[    0.728074] pps_core: LinuxPPS API ver. 1 registered
-[    0.732008] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
-[    0.736021] PTP clock support registered
-[    0.740022] dmi: Firmware registration failed.
-[    0.744273] NetLabel: Initializing
-[    0.748007] NetLabel:  domain hash size = 128
-[    0.752006] NetLabel:  protocols = UNLABELED CIPSOv4 CALIPSO
-[    0.756287] NetLabel:  unlabeled traffic allowed by default
-[    0.760582] clocksource: Switched to clocksource kvm-clock
-[    0.778344] VFS: Disk quotas dquot_6.6.0
-[    0.790769] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
-[    0.822841] NET: Registered protocol family 2
-[    0.837069] TCP established hash table entries: 1024 (order: 1, 8192 bytes)
-[    0.859342] TCP bind hash table entries: 1024 (order: 2, 16384 bytes)
-[    0.879465] TCP: Hash tables configured (established 1024 bind 1024)
-[    0.902117] UDP hash table entries: 256 (order: 1, 8192 bytes)
-[    0.920399] UDP-Lite hash table entries: 256 (order: 1, 8192 bytes)
-[    0.940404] NET: Registered protocol family 1
-[    0.955256] Unpacking initramfs...
-[    3.052249] Freeing initrd memory: 26552K
-[    3.065617] clocksource: tsc: mask: 0xffffffffffffffff max_cycles: 0x19ea79d464e, max_idle_ns: 440795215514 ns
-[    3.096416] platform rtc_cmos: registered platform RTC device (no PNP device found)
-[    3.120848] Scanning for low memory corruption every 60 seconds
-[    3.140348] audit: initializing netlink subsys (disabled)
-[    3.160735] Initialise system trusted keyrings
-[    3.174717] Key type blacklist registered
-[    3.187779] audit: type=2000 audit(1651886382.899:1): state=initialized audit_enabled=0 res=1
-[    3.214358] workingset: timestamp_bits=36 max_order=15 bucket_order=0
-[    3.241777] squashfs: version 4.0 (2009/01/31) Phillip Lougher
-[    3.264886] Key type asymmetric registered
-[    3.277843] Asymmetric key parser 'x509' registered
-[    3.293150] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
-[    3.316612] io scheduler noop registered (default)
-[    3.331830] io scheduler cfq registered
-[    3.344407] Serial: 8250/16550 driver, 1 ports, IRQ sharing disabled
-[    3.436907] serial8250: ttyS0 at I/O 0x3f8 (irq = 4, base_baud = 115200) is a U6_16550A
-[    3.472688] loop: module loaded
-[    3.482762] Loading iSCSI transport class v2.0-870.
-[    3.499158] iscsi: registered transport (tcp)
-[    3.513021] tun: Universal TUN/TAP device driver, 1.6
-[    5.182788] i8042: Can't read CTR while initializing i8042
-[    5.200323] i8042: probe of i8042 failed with error -5
-[    5.216681] hidraw: raw HID events driver (C) Jiri Kosina
-[    5.234068] nf_conntrack version 0.5.0 (1024 buckets, 4096 max)
-[    5.252947] ip_tables: (C) 2000-2006 Netfilter Core Team
-[    5.269699] Initializing XFRM netlink socket
-[    5.284294] NET: Registered protocol family 10
-[    5.302930] Segment Routing with IPv6
-[    5.314933] NET: Registered protocol family 17
-[    5.328924] Bridge firewalling registered
-[    5.341851] NET: Registered protocol family 40
-[    5.357171] registered taskstats version 1
-[    5.370211] Loading compiled-in X.509 certificates
-[    5.388792] Loaded X.509 cert 'Build time autogenerated kernel key: e98e9d271da5d0a322cc4d7bfaa8c2c4c3e46010'
-[    5.421131] Key type encrypted registered
-[    5.460265] Freeing unused kernel memory: 1324K
-[    5.476248] Write protecting the kernel read-only data: 12288k
-[    5.574072] Freeing unused kernel memory: 2016K
-[    5.614686] Freeing unused kernel memory: 568K
+[    0.008078] Calibrating delay loop (skipped) preset value.. 3595.83 BogoMIPS (lpj=7191668)
+[    0.016042] pid_max: default: 32768 minimum: 301
+[    0.024581] Security Framework initialized
+[    0.032223] SELinux:  Initializing.
+[    0.045377] Dentry cache hash table entries: 16384 (order: 5, 131072 bytes)
+[    0.056285] Inode-cache hash table entries: 8192 (order: 4, 65536 bytes)
+[    0.064149] Mount-cache hash table entries: 512 (order: 0, 4096 bytes)
+[    0.072159] Mountpoint-cache hash table entries: 512 (order: 0, 4096 bytes)
+[    0.091488] Last level iTLB entries: 4KB 0, 2MB 0, 4MB 0
+[    0.096042] Last level dTLB entries: 4KB 0, 2MB 0, 4MB 0, 1GB 0
+[    0.104109] Spectre V1 : Mitigation: usercopy/swapgs barriers and __user pointer sanitization
+[    0.112042] Spectre V2 : Mitigation: Full generic retpoline
+[    0.120040] Spectre V2 : Spectre v2 / SpectreRSB mitigation: Filling RSB on context switch
+[    0.128041] Spectre V2 : Enabling Restricted Speculation for firmware calls
+[    0.136056] Spectre V2 : mitigation: Enabling conditional Indirect Branch Prediction Barrier
+[    0.144042] Speculative Store Bypass: Mitigation: Speculative Store Bypass disabled via prctl and seccomp
+[    0.152114] MDS: Mitigation: Clear CPU buffers
+[    0.214964] Freeing SMP alternatives memory: 28K
+[    0.233255] smpboot: Max logical packages: 1
+[    0.240047] smpboot: SMP motherboard not detected
+[    0.248042] smpboot: SMP disabled
+[    0.256054] Not enabling interrupt remapping due to skipped IO-APIC setup
+[    0.484000] Performance Events: no PMU driver, software events only.
+[    0.485481] Hierarchical SRCU implementation.
+[    0.496038] smp: Bringing up secondary CPUs ...
+[    0.500006] smp: Brought up 1 node, 1 CPU
+[    0.504006] smpboot: Total of 1 processors activated (3595.83 BogoMIPS)
+[    0.509342] devtmpfs: initialized
+[    0.512329] x86/mm: Memory block size: 128MB
+[    0.518196] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.520018] futex hash table entries: 256 (order: 2, 16384 bytes)
+[    0.529819] NET: Registered protocol family 16
+[    0.536183] cpuidle: using governor ladder
+[    0.540005] cpuidle: using governor menu
+[    0.605308] HugeTLB registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.608022] HugeTLB registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.612503] SCSI subsystem initialized
+[    0.616046] pps_core: LinuxPPS API ver. 1 registered
+[    0.620004] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.624012] PTP clock support registered
+[    0.628012] dmi: Firmware registration failed.
+[    0.632147] NetLabel: Initializing
+[    0.636004] NetLabel:  domain hash size = 128
+[    0.640003] NetLabel:  protocols = UNLABELED CIPSOv4 CALIPSO
+[    0.644195] NetLabel:  unlabeled traffic allowed by default
+[    0.648340] clocksource: Switched to clocksource kvm-clock
+[    0.658818] VFS: Disk quotas dquot_6.6.0
+[    0.666111] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.686119] NET: Registered protocol family 2
+[    0.694585] TCP established hash table entries: 1024 (order: 1, 8192 bytes)
+[    0.707311] TCP bind hash table entries: 1024 (order: 2, 16384 bytes)
+[    0.719265] TCP: Hash tables configured (established 1024 bind 1024)
+[    0.733299] UDP hash table entries: 256 (order: 1, 8192 bytes)
+[    0.744279] UDP-Lite hash table entries: 256 (order: 1, 8192 bytes)
+[    0.756218] NET: Registered protocol family 1
+[    0.765617] Unpacking initramfs...
+[    2.022417] Freeing initrd memory: 26552K
+[    2.030506] clocksource: tsc: mask: 0xffffffffffffffff max_cycles: 0x19ea79d464e, max_idle_ns: 440795215514 ns
+[    2.048679] platform rtc_cmos: registered platform RTC device (no PNP device found)
+[    2.062918] Scanning for low memory corruption every 60 seconds
+[    2.074358] audit: initializing netlink subsys (disabled)
+[    2.086214] Initialise system trusted keyrings
+[    2.094466] Key type blacklist registered
+[    2.101996] audit: type=2000 audit(1663915444.236:1): state=initialized audit_enabled=0 res=1
+[    2.117582] workingset: timestamp_bits=36 max_order=15 bucket_order=0
+[    2.178675] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+[    2.192437] Key type asymmetric registered
+[    2.200099] Asymmetric key parser 'x509' registered
+[    2.209108] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 252)
+[    2.222790] io scheduler noop registered (default)
+[    2.231904] io scheduler cfq registered
+[    2.239250] Serial: 8250/16550 driver, 1 ports, IRQ sharing disabled
+[    2.302475] serial8250: ttyS0 at I/O 0x3f8 (irq = 4, base_baud = 115200) is a U6_16550A
+[    2.326094] loop: module loaded
+[    2.332191] Loading iSCSI transport class v2.0-870.
+[    2.344392] iscsi: registered transport (tcp)
+[    2.352535] tun: Universal TUN/TAP device driver, 1.6
+[    3.544520] i8042: Can't read CTR while initializing i8042
+[    3.554685] i8042: probe of i8042 failed with error -5
+[    3.564222] hidraw: raw HID events driver (C) Jiri Kosina
+[    3.574731] nf_conntrack version 0.5.0 (1024 buckets, 4096 max)
+[    3.586024] ip_tables: (C) 2000-2006 Netfilter Core Team
+[    3.595895] Initializing XFRM netlink socket
+[    3.604417] NET: Registered protocol family 10
+[    3.623833] Segment Routing with IPv6
+[    3.630698] NET: Registered protocol family 17
+[    3.639294] Bridge firewalling registered
+[    3.647372] NET: Registered protocol family 40
+[    3.656906] registered taskstats version 1
+[    3.664518] Loading compiled-in X.509 certificates
+[    3.676193] Loaded X.509 cert 'Build time autogenerated kernel key: e98e9d271da5d0a322cc4d7bfaa8c2c4c3e46010'
+[    3.695047] Key type encrypted registered
+[    3.717850] Freeing unused kernel memory: 1324K
+[    3.728149] Write protecting the kernel read-only data: 12288k
+[    3.786224] Freeing unused kernel memory: 2016K
+[    3.810389] Freeing unused kernel memory: 568K
 
    OpenRC 0.44.7.10dab8bfb7 is starting up Linux 4.14.174 (x86_64)
 
@@ -268,7 +272,42 @@ Device "eth0" does not exist.
 Welcome to Alpine Linux 3.15
 Kernel 4.14.174 on an x86_64 (ttyS0)
 
-(none) login:
+(none) login: root
+Password:
+Welcome to Alpine!
+
+[    8.034101] random: fast init done
+The Alpine Wiki contains a large amount of how-to guides and general
+information about administrating Alpine systems.
+See <http://wiki.alpinelinux.org/>.
+
+You can setup the system with the command: setup-alpine
+
+You may change this message by editing /etc/motd.
+
+login[1058]: root login on 'ttyS0'
+(none):~# ls -lat /
+total 0
+drwx------    3 root     root            80 Sep 23 06:44 root
+drwxr-xr-x    5 root     root           200 Sep 23 06:44 run
+drwxr-xr-x   19 root     root           400 Sep 23 06:44 .
+drwxr-xr-x   19 root     root           400 Sep 23 06:44 ..
+drwxr-xr-x    7 root     root          2120 Sep 23 06:44 dev
+dr-xr-xr-x   12 root     root             0 Sep 23 06:44 sys
+dr-xr-xr-x   55 root     root             0 Sep 23 06:44 proc
+drwxr-xr-x    2 root     root          1780 May  7 00:55 bin
+drwxr-xr-x   26 root     root          1040 May  7 00:55 etc
+lrwxrwxrwx    1 root     root            10 May  7 00:55 init -> /sbin/init
+drwxr-xr-x    2 root     root          3460 May  7 00:55 sbin
+drwxr-xr-x   10 root     root           700 May  7 00:55 lib
+drwxr-xr-x    9 root     root           180 May  7 00:54 usr
+drwxr-xr-x    2 root     root            40 May  7 00:54 home
+drwxr-xr-x    5 root     root           100 May  7 00:54 media
+drwxr-xr-x    2 root     root            40 May  7 00:54 mnt
+drwxr-xr-x    2 root     root            40 May  7 00:54 opt
+drwxr-xr-x    2 root     root            40 May  7 00:54 srv
+drwxr-xr-x   12 root     root           260 May  7 00:54 var
+drwxrwxrwt    2 root     root            40 May  7 00:54 tmp
 ```
 
 ### Test
