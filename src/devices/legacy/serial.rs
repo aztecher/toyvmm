@@ -31,7 +31,7 @@ impl<W: Write + Send + 'static> BusDevice
 
     fn write(&mut self, offset: u64, data: &[u8]) {
         if let Err(e) = self.serial.write(offset as u8, data[0]) {
-            println!("serial writing error");
+            println!("serial writing error: {:?}", e);
         }
     }
 }

@@ -117,6 +117,7 @@ pub fn boot_kernel(
     let mut io_bus = IoBus::new();
     let com_evt_1_3 = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
     let com_evt_2_4 = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
+    let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
     let stdio_serial = Arc::new(Mutex::new(SerialDevice {
         serial: serial::Serial::with_events(
             com_evt_1_3.try_clone().unwrap(),
@@ -135,7 +136,6 @@ pub fn boot_kernel(
 
     let id = 0;
     let num_cpus = 1;
-    let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
     let vcpu_thread_barrier = Arc::new(Barrier::new(num_cpus + 1));
     let kill_signaled = Arc::new(AtomicBool::new(false));
 
@@ -177,6 +177,7 @@ pub fn boot_kernel(
                             }
                             r => {
                                 println!("unexpected exit reason: {:?}", r);
+                                break;
                            }
                         }
                     }
@@ -193,12 +194,8 @@ pub fn boot_kernel(
         }).unwrap()
     );
 
+    // run vcpu threads!
     vcpu_thread_barrier.wait();
-    for handle in vcpu_handles {
-        if let Err(e) = handle.join() {
-            println!("failed to join vcpu thread: {:?}", e);
-        }
-    }
 
     use vmm_sys_util::{
         poll::{PollToken, PollContext, PollEvents},
@@ -243,7 +240,9 @@ pub fn boot_kernel(
                 Token::Stdin => {
                     let mut out = [0u8; 64];
                     match stdin_lock.read_raw(&mut out[..]) {
-                        Ok(0) => {},
+                        Ok(0) => {
+                            println!("eof!");
+                        },
                         Ok(count) => {
                             stdio_serial
                                 .lock()
@@ -254,12 +253,18 @@ pub fn boot_kernel(
                         }
                         Err(e) => {
                             println!("error while reading stdin: {:?}", e);
-
                         }
                     }
                 }
                 _ => {}
             }
+        }
+    }
+
+    // wait for stopping all threads
+    for handle in vcpu_handles {
+        if let Err(e) = handle.join() {
+            println!("failed to join vcpu thread: {:?}", e);
         }
     }
 }
