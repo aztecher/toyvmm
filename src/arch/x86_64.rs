@@ -233,7 +233,25 @@ fn configure_segments_and_sregs(sregs: &mut kvm_sregs, mem: &GuestMemoryMmap) ->
         gdt::gdt_entry(0xc093, 0, 0xfffff), // DATA
         gdt::gdt_entry(0x808b, 0, 0xfffff), // TSS
     ];
-
+    // > https://wiki.osdev.org/GDT_Tutorialを見ると値がちょっとおかしいかもしれねぇ
+    //
+    // > https://wiki.osdev.org/Global_Descriptor_Table
+    //
+    //              55 52     47     40 39        31               16 15                0
+    // CODE: 0b0..._1010_1111_1001_1011_0000_0000_0000_0000_0000_0000_1111_1111_1111_1111
+    //              <-f->     <-Access-><---------------------------> <----- limit ----->
+    // - Flags  : 1010      => G(limit is in 4KiB), L(Long mode)
+    // - Access : 1001_1011 => P(must 1), S(code/data type), E(executable), RW(readable/writable), A(CPU access allowed)
+    //   - 0xa09b of A,9,B represents above values
+    //
+    // DATA: 0b0..._1100_1111_1001_0011_0000_0000_0000_0000_0000_0000_1111_1111_1111_1111
+    // - Flags  : 1100      => G(limit is in 4KiB), DB(32-bit protected mode)
+    // - Access : 1001_0011 => P(must 1), S(code/data type), RW(readable/writable), A(CPU access allowed)
+    //
+    // TSS
+    // - Flags  : 1000      => G(limit is in 4KiB)
+    // - Access : 1000_1011 => P(must 1), E(executable), RW(readable/writable), A(CPU access allowed)
+    //    - TSS requires to support Intel VT
     let code_seg = gdt::kvm_segment_from_gdt(gdt_table[1], 1);
     let data_seg = gdt::kvm_segment_from_gdt(gdt_table[2], 2);
     let tss_seg = gdt::kvm_segment_from_gdt(gdt_table[3], 3);
