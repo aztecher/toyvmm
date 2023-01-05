@@ -28,6 +28,7 @@ If you find any mistakes or my misunderstandings in the documentation, please fe
 **CHANGE LOG**
 
 * Jan 5, 2023 : Add contents (Load Linux Kernel, and its subcontents)
+  * Now it's currently available only in ja, but will soon be translated into en.
 * Apr 7, 2022 : First publish (Introduction, QuickStart, Running Tiny Code in VM)
 
 ## Development
