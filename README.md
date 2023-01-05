@@ -25,6 +25,11 @@ In addition, Docker installation is required since the code testing and executio
 As we expand the implementation of ToyVMM, we plan to enhance the contents of the book as well.
 If you find any mistakes or my misunderstandings in the documentation, please feel free to submit an issue to the [toyvmm-book](https://github.com/aztecher/toyvmm-book) repository.
 
+**CHANGE LOG**
+
+* Jan 5, 2023 : Add contents (Load Linux Kernel, and its subcontents)
+* Apr 7, 2022 : First publish (Introduction, QuickStart, Running Tiny Code in VM)
+
 ## Development
 
 ### Run LWN article example
