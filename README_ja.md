@@ -22,6 +22,12 @@ ToyVMMは以下を達成することを目的としています
 ToyVMMの実装拡張とともに、bookの内容も拡充していく予定です
 もし内容に間違いを含んでいる場合は、気軽に[toyvmm-book](https://github.com/aztecher/toyvmm-book)にissueを起票してください
 
+
+**CHANGE LOG**
+
+* Jan 5, 2023 : Add contents (Load Linux Kernel, and its subcontents)
+* Apr 7, 2022 : First publish (Introduction, QuickStart, Running Tiny Code in VM)
+
 ## Development
 
 ### Run lwn article example
