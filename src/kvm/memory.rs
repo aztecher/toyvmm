@@ -6,7 +6,7 @@ use vm_memory::{
         NewBitmap,
         check_file_offset,
     },
-    FileOffset, GuestAddress, Error
+    FileOffset, GuestMemory, GuestAddress, Error
 };
 use std::os::unix::io::AsRawFd;
 use crate::utils::util::get_page_size;
@@ -16,6 +16,11 @@ pub type GuestRegionMmap = vm_memory::GuestRegionMmap<Option<AtomicBitmap>>;
 pub type GuestMmapRegion = vm_memory::MmapRegion<Option<AtomicBitmap>>;
 
 const GUARD_PAGE_COUNT: usize = 1;
+
+// pub fn do_in_region<F, T>(mem: &GuestMemoryMmap, addr: GuestAddress, cb: F) -> Result<T>
+// {
+//     mem.address_in_range()
+// }
 
 pub fn create_region(
     maybe_file_offset: Option<FileOffset>,

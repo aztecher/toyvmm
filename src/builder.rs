@@ -6,27 +6,34 @@ use linux_loader::{
         elf::Elf as Loader,
     }
 };
+use ::epoll as ep;
 use linux_loader::cmdline::Cmdline as LoaderKernelCmdline;
 use vm_memory::{Bytes, GuestAddress};
 use vmm_sys_util::eventfd::EventFd;
 use vm_superio::serial;
 use std::{
+    net::Ipv4Addr,
     fs::File,
     io::{self, Read, Seek, SeekFrom},
     sync::{
         Arc, Barrier, Mutex,
         atomic::{AtomicBool, Ordering},
     },
+    os::unix::io::AsRawFd,
 };
 use crate::{
     vm_resources,
+    vm_control::VmResponse,
     arch,
+    device_manager::DeviceManager,
     devices::{
+        epoll,
         bus::Bus as IoBus,
         legacy::{
             EventFdTrigger,
             serial::{SerialEventsWrapper, SerialDevice},
         },
+        virtio::net::Net,
     },
     vmm::{Error, Vmm},
     kvm::{
@@ -76,7 +83,9 @@ pub fn boot_kernel(
     initrd_file: &mut Option<File>,
     boot_cmdline: &mut Cmdline,
 ) {
-    let mem_size_mib = 128; // MiB
+    // let mem_size_mib = 128; // MiB
+    // let mem_size_mib = 256; // MiB
+    let mem_size_mib = 2048; // MiB
     let track_dirty_page = false;
     let kvm = Kvm::new().expect("Failed to open /dev/kvm");
     let mut vm = Vm::new(&kvm).expect("Failed to create vm");
@@ -87,6 +96,29 @@ pub fn boot_kernel(
         track_dirty_page,
     ).unwrap();
     vm.memory_init(&guest_memory, kvm.get_nr_memslots(), track_dirty_page).unwrap();
+
+    // DeviceManager for virtio mmio device
+    let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
+    let mut epoll_context = epoll::EpollContext::new(exit_evt.as_raw_fd()).unwrap();
+    let mut device_manager = DeviceManager::new(guest_memory.clone(), 0x1000, arch::MMIO_MEM_START, 5);
+    // let mut device_manager = DeviceManager::new(guest_memory.clone(), 0x10000000, arch::MMIO_MEM_START, 5);
+    let epoll_config = epoll_context.allocate_virtio_net_tokens();
+    let net = Box::new(Net::new(
+        Ipv4Addr::new(192, 168, 0, 10),
+        Ipv4Addr::new(255, 255, 255, 0),
+        epoll_config,
+    ).unwrap());
+    device_manager.register_mmio(net, boot_cmdline).unwrap();
+    for request in device_manager.vm_requests {
+        if let VmResponse::Err(e) = request.execute(vm.fd()) {
+            println!("error vm response : {}", e);
+            return;
+        }
+        // if let VmResponse::Err(e) = request.execute(vm.fd()) {
+        //     return e
+        // }
+    }
+    let mmio_bus = device_manager.bus.clone();
 
     let kernel_entry = Loader::load::<File, memory::GuestMemoryMmap>(
         &guest_memory,
@@ -117,7 +149,7 @@ pub fn boot_kernel(
     let mut io_bus = IoBus::new();
     let com_evt_1_3 = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
     let com_evt_2_4 = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
-    let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
+    // let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
     let stdio_serial = Arc::new(Mutex::new(SerialDevice {
         serial: serial::Serial::with_events(
             com_evt_1_3.try_clone().unwrap(),
@@ -165,18 +197,20 @@ pub fn boot_kernel(
                             VcpuExit::IoOut(addr, data) => {
                                 io_bus.write(addr as u64, data);
                             }
-                            VcpuExit::MmioRead(_, _) => {},
-                            VcpuExit::MmioWrite(_, _) => {}
+                            VcpuExit::MmioRead(addr, data) => {
+                                mmio_bus.read(addr, data);
+                            },
+                            VcpuExit::MmioWrite(addr, data) => {
+                                mmio_bus.write(addr, data);
+                            }
                             VcpuExit::Hlt => {
-                                println!("KVM_EXIT_HLT");
                                 break;
                             }
                             VcpuExit::Shutdown => {
-                                println!("KVM_EXIT_SHUTDOWN");
                                 break;
                             }
-                            r => {
-                                println!("unexpected exit reason: {:?}", r);
+                            _ => {
+                                println!("unexpected exit reason");
                                 break;
                            }
                         }
@@ -220,29 +254,46 @@ pub fn boot_kernel(
             }
         }
     }
+
     let stdin_handle = io::stdin();
     let stdin_lock = stdin_handle.lock();
     stdin_lock.set_raw_mode().expect("failed to set terminal raw mode");
-    let ctx: PollContext<Token> = PollContext::new().unwrap();
-    ctx.add(&exit_evt, Token::Exit).unwrap();
-    ctx.add(&stdin_lock, Token::Stdin).unwrap();
+    defer! {{
+        if let Err(e) = stdin_lock.set_canon_mode() {
+            println!("cannot set canon mode for stdin: {:?}", e);
+        }
+    }};
+
+    const EPOLL_EVENT_LEN: usize = 100;
+    let mut events = Vec::<ep::Event>::with_capacity(EPOLL_EVENT_LEN);
+    // Safe as we pass to set_len the value passed to with_capacity
+    unsafe { events.set_len(EPOLL_EVENT_LEN) };
+    let epoll_raw_fd = epoll_context.epoll_raw_fd;
     'poll: loop {
-        let pollevents: PollEvents<Token> = ctx.wait().unwrap();
-        let tokens: Vec<Token> = pollevents
-            .iter_readable()
-            .map(|e| e.token()).collect();
-        for &token in tokens.iter() {
-            match token {
-                Token::Exit => {
-                    println!("vcpu requested shutdown");
-                    break 'poll;
+        let num_events = ep::wait(
+            epoll_raw_fd,
+            -1,
+            &mut events[..],
+        ).unwrap();
+        for i in 0..num_events {
+            let dispatch_idx = events[i].data() as usize;
+            let dispatch_type = epoll_context.dispatch_table[dispatch_idx];
+            match dispatch_type {
+                epoll::EpollDispatch::Exit => {
+                    break 'poll
                 }
-                Token::Stdin => {
+                epoll::EpollDispatch::Stdin => {
                     let mut out = [0u8; 64];
                     match stdin_lock.read_raw(&mut out[..]) {
                         Ok(0) => {
-                            println!("eof!");
-                        },
+                            // Zero-length read indicates EOF. Remove from pollable
+                            ep::ctl(
+                                epoll_raw_fd,
+                                ep::EPOLL_CTL_DEL,
+                                libc::STDIN_FILENO,
+                                events[i],
+                            ).unwrap();
+                        }
                         Ok(count) => {
                             stdio_serial
                                 .lock()
@@ -256,7 +307,10 @@ pub fn boot_kernel(
                         }
                     }
                 }
-                _ => {}
+                epoll::EpollDispatch::DeviceHandler(device_idx, device_token) => {
+                    let handler = epoll_context.get_device_handler(device_idx);
+                    handler.handle_event(device_token, events[i].events().bits());
+                }
             }
         }
     }

@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use crate::vm_resources::{VmResources, BootSourceConfig, VmConfig};
 
 // pub const DEFAULT_BOOT_ARGS: &str = "reboot=k panic=1 pci=off";
-pub const DEFAULT_BOOT_ARGS: &str = "console=ttyS0 reboot=k panic=1 pci=off";
+// pub const DEFAULT_BOOT_ARGS: &str = "console=ttyS0 reboot=k panic=1 pci=off";
+pub const DEFAULT_BOOT_ARGS: &str = "console=ttyS0";
 #[cfg(target_arch = "x86_64")]
 pub const DEFAULT_KERNEL_IMAGE: &str = "test_elf.bin";
 

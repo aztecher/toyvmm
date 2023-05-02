@@ -21,7 +21,8 @@ use nix::unistd::getuid;
 const _ZERO_PAGE_START: u64 = 0x7000;
 
 const DEFAULT_VMLINUX_PATH: &str = "vmlinux.bin";
-const DEFAULT_CMDLINE_ARGS: &str = "console=ttyS0 noapic noacpi reboot=k panic=1 pci=off nomodule";
+// const DEFAULT_CMDLINE_ARGS: &str = "console=ttyS0 noapic noacpi reboot=k panic=1 pci=off nomodule";
+const DEFAULT_CMDLINE_ARGS: &str = "console=ttyS0 reboot=k panic=1";
 
 fn main() {
     let app = App::new("ToyVMM is a hypervisor for learning virtualization technology")

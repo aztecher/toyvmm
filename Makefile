@@ -32,6 +32,12 @@ run_lwn_container: docker-image
 run_linux: ## Execute Linux kernel (Require vmlinux.bin, initrd.img in this directory)
 	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE}
 
+run_linux_debug:
+	sudo -E strace -y -e epoll_create,epoll_ctl,epoll_wait cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE}
+
+# run_linux_virt:
+# 	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i initrd.img-5.4.0-139-generic
+
 test: ## Execute cargo test
 	sudo -E cargo test -- --nocapture
 	sudo rm -rf target

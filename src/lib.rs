@@ -1,10 +1,18 @@
 pub mod builder;
 pub mod vmm;
 pub mod vm_resources;
+pub mod vm_control;
 pub mod kvm;
 pub mod utils;
 pub mod arch;
 pub mod devices;
+pub mod device_manager;
+
+#[macro_use]
+extern crate vmm_sys_util;
+
+#[macro_use]
+extern crate scopeguard;
 
 #[derive(Debug)]
 pub enum Error {
