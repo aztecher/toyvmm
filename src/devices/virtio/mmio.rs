@@ -112,6 +112,10 @@ impl MmioTransport {
         }
     }
 
+    fn check_device_status(&self, set: u32, clr: u32) -> bool {
+        self.driver_status & (set | clr) == set
+    }
+
     fn with_queue<U, F>(&self, d: U, f: F) -> U
     where
         F: FnOnce(&Queue) -> U,
@@ -149,9 +153,7 @@ impl BusDevice for MmioTransport {
                     }
                     0x34 => self.with_queue(0, |q| q.get_max_size() as u32),
                     0x44 => self.with_queue(0, |q| q.ready as u32),
-                    0x60 => {
-                        self.interrupt_status.load(Ordering::SeqCst) as u32
-                    }
+                    0x60 => self.interrupt_status.load(Ordering::SeqCst) as u32,
                     0x70 => self.driver_status,
                     0xfc => self.config_generation,
                     _ => {
@@ -167,15 +169,21 @@ impl BusDevice for MmioTransport {
                 println!("invalid virtio mmio read: 0x{:x}:0x{:x}", offset, data.len());
             }
         }
+        // let first_16bit = u16::from(data[0]) | (u16::from(data[1]) << 8);
+        // let second_16bit = u16::from(data[2]) | (u16::from(data[3]) << 8);
+        // println!("mmio read: offset=0x{:x}, data=0x{:016b}{:016b}", offset, second_16bit, first_16bit);
     }
 
     fn write(&mut self, offset: u64, data: &[u8]) {
+        // let first_16bit = u16::from(data[0]) | (u16::from(data[1]) << 8);
+        // let second_16bit = u16::from(data[2]) | (u16::from(data[3]) << 8);
+        // println!("mmio write: offset=0x{:x}, data=0x{:016b}{:016b}", offset, second_16bit, first_16bit);
         fn hi(v: &mut GuestAddress, x: u32) {
-            *v = (*v & 0xffffffff) | ((x as u64) << 32)
+            *v = (*v & 0xffff_ffff) | (u64::from(x) << 32)
         }
 
         fn lo(v: &mut GuestAddress, x: u32) {
-            *v = (*v & !0xffffffff) | (x as u64)
+            *v = (*v & !0xffff_ffff) | u64::from(x)
         }
 
         let mut mut_q = false;
@@ -189,9 +197,10 @@ impl BusDevice for MmioTransport {
                     0x30 => self.queue_select = v,
                     0x38 => mut_q = self.with_queue_mut(|q| q.size = v as u16),
                     0x44 => mut_q = self.with_queue_mut(|q| q.ready = v == 1),
-                    0x50 => {} // handled with ioeventfd
                     0x64 => {
-                        self.interrupt_status.fetch_add(!(v as usize), Ordering::SeqCst);
+                        if self.check_device_status(status::DRIVER_OK, 0) {
+                            self.interrupt_status.fetch_and(!(v as usize), Ordering::SeqCst);
+                        }
                     }
                     0x70 => self.driver_status = v,
                     0x80 => mut_q = self.with_queue_mut(|q| lo(&mut q.desc_table, v)),
@@ -206,7 +215,14 @@ impl BusDevice for MmioTransport {
                     }
                 }
             }
-            0x100..=0xfff => return self.device.write_config(offset - 0x100, data),
+            0x100..=0xfff => {
+                println!("mmio write on 0x100 ~ 0xfff : data = {:?}", data);
+                if self.check_device_status(status::DRIVER, status::FAILED) {
+                    self.device.write_config(offset - 0x100, data)
+                } else {
+                    println!("can' write to device config data area because driver is ready");
+                }
+            }
             _ => {
                 println!("invalid virtio mmio write: 0x{:x}:0x{:x}", offset, data.len());
                 return;

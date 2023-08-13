@@ -1,49 +1,45 @@
-use linux_loader::{
-    cmdline::Cmdline,
-    loader::{
-        load_cmdline,
-        KernelLoader,
-        elf::Elf as Loader,
-    }
-};
-use ::epoll as ep;
-use linux_loader::cmdline::Cmdline as LoaderKernelCmdline;
-use vm_memory::{Bytes, GuestAddress};
-use vmm_sys_util::eventfd::EventFd;
-use vm_superio::serial;
-use std::{
-    net::Ipv4Addr,
-    fs::File,
-    io::{self, Read, Seek, SeekFrom},
-    sync::{
-        Arc, Barrier, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
-    os::unix::io::AsRawFd,
-};
 use crate::{
-    vm_resources,
-    vm_control::VmResponse,
     arch,
     device_manager::DeviceManager,
     devices::{
-        epoll,
         bus::Bus as IoBus,
+        epoll,
         legacy::{
+            serial::{SerialDevice, SerialEventsWrapper},
             EventFdTrigger,
-            serial::{SerialEventsWrapper, SerialDevice},
         },
-        virtio::net::Net,
+        virtio::{block::Block, net::Net},
     },
-    vmm::{Error, Vmm},
     kvm::{
-        vm::Vm,
-        vcpu::{VcpuConfig, Vcpu},
-        vcpu::Error as VcpuError,
         memory,
+        vcpu::Error as VcpuError,
+        vcpu::{Vcpu, VcpuConfig},
+        vm::Vm,
+    },
+    vm_control::VmResponse,
+    vm_resources,
+    vmm::{Error, Vmm},
+};
+use ::epoll as ep;
+use kvm_ioctls::{Kvm, VcpuExit};
+use linux_loader::cmdline::Cmdline as LoaderKernelCmdline;
+use linux_loader::{
+    cmdline::Cmdline,
+    loader::{elf::Elf as Loader, load_cmdline, KernelLoader},
+};
+use std::{
+    fs::{File, OpenOptions},
+    io::{self, Read, Seek, SeekFrom},
+    net::Ipv4Addr,
+    os::unix::io::AsRawFd,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Barrier, Mutex,
     },
 };
-use kvm_ioctls::{Kvm, VcpuExit};
+use vm_memory::{Bytes, GuestAddress};
+use vm_superio::serial;
+use vmm_sys_util::eventfd::EventFd;
 
 #[derive(Debug)]
 pub enum StartVmError {
@@ -59,7 +55,7 @@ pub enum StartVmError {
     MissingKernelConfig,
     Vm,
     VcpuCreate,
-    VcpuConfigure(VcpuError)
+    VcpuConfigure(VcpuError),
 }
 
 pub struct InitrdConfig {
@@ -71,7 +67,9 @@ fn create_serial(com_event: EventFdTrigger) -> Arc<Mutex<SerialDevice>> {
     let serial_device = Arc::new(Mutex::new(SerialDevice {
         serial: serial::Serial::with_events(
             com_event.try_clone().unwrap(),
-            SerialEventsWrapper { buffer_read_event_fd: None },
+            SerialEventsWrapper {
+                buffer_read_event_fd: None,
+            },
             Box::new(std::io::sink()),
         ),
     }));
@@ -81,43 +79,52 @@ fn create_serial(com_event: EventFdTrigger) -> Arc<Mutex<SerialDevice>> {
 pub fn boot_kernel(
     kernel_file: &mut File,
     initrd_file: &mut Option<File>,
+    root_dev: Option<File>,
     boot_cmdline: &mut Cmdline,
 ) {
-    // let mem_size_mib = 128; // MiB
-    // let mem_size_mib = 256; // MiB
     let mem_size_mib = 2048; // MiB
     let track_dirty_page = false;
     let kvm = Kvm::new().expect("Failed to open /dev/kvm");
     let mut vm = Vm::new(&kvm).expect("Failed to create vm");
     let mut kvm_cpuid = vm.supported_cpuid().clone();
     vm.setup_irqchip().unwrap();
-    let guest_memory = create_guest_memory(
-        mem_size_mib,
-        track_dirty_page,
-    ).unwrap();
-    vm.memory_init(&guest_memory, kvm.get_nr_memslots(), track_dirty_page).unwrap();
+    let guest_memory = create_guest_memory(mem_size_mib, track_dirty_page).unwrap();
+    vm.memory_init(&guest_memory, kvm.get_nr_memslots(), track_dirty_page)
+        .unwrap();
 
     // DeviceManager for virtio mmio device
     let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
     let mut epoll_context = epoll::EpollContext::new(exit_evt.as_raw_fd()).unwrap();
-    let mut device_manager = DeviceManager::new(guest_memory.clone(), 0x1000, arch::MMIO_MEM_START, 5);
-    // let mut device_manager = DeviceManager::new(guest_memory.clone(), 0x10000000, arch::MMIO_MEM_START, 5);
+    let mut device_manager =
+        DeviceManager::new(guest_memory.clone(), 0x1000, arch::MMIO_MEM_START, 5);
+
+    // virtio-blk
+    if root_dev.is_some() {
+        boot_cmdline.insert_str(" root=/dev/vda").unwrap();
+        let epoll_config = epoll_context.allocate_virtio_blk_token();
+        let block = Box::new(Block::new(root_dev.unwrap(), epoll_config).unwrap());
+        device_manager.register_mmio(block, boot_cmdline).unwrap();
+    }
+
+    // virtio-net
     let epoll_config = epoll_context.allocate_virtio_net_tokens();
-    let net = Box::new(Net::new(
-        Ipv4Addr::new(192, 168, 0, 10),
-        Ipv4Addr::new(255, 255, 255, 0),
-        epoll_config,
-    ).unwrap());
+    let net = Box::new(
+        Net::new(
+            Ipv4Addr::new(192, 168, 0, 10),
+            Ipv4Addr::new(255, 255, 255, 0),
+            epoll_config,
+        )
+        .unwrap(),
+    );
     device_manager.register_mmio(net, boot_cmdline).unwrap();
     for request in device_manager.vm_requests {
         if let VmResponse::Err(e) = request.execute(vm.fd()) {
             println!("error vm response : {}", e);
             return;
         }
-        // if let VmResponse::Err(e) = request.execute(vm.fd()) {
-        //     return e
-        // }
     }
+
+    // clone mmio_bus for vCPU threads
     let mmio_bus = device_manager.bus.clone();
 
     let kernel_entry = Loader::load::<File, memory::GuestMemoryMmap>(
@@ -125,17 +132,17 @@ pub fn boot_kernel(
         None,
         kernel_file,
         Some(vm_memory::GuestAddress(arch::x86_64::get_kernel_start())),
-    ).unwrap();
-    let initrd = Some(load_initrd(
-        &guest_memory,
-        initrd_file.as_mut().unwrap(),
-    ).unwrap());
+    )
+    .unwrap();
+    // let initrd = Some(load_initrd(&guest_memory, initrd_file.as_mut().unwrap()).unwrap());
+    let initrd = load_initrd_from_image(&guest_memory, initrd_file.as_mut()).unwrap();
 
     load_cmdline::<memory::GuestMemoryMmap>(
         &guest_memory,
         GuestAddress(arch::x86_64::CMDLINE_START),
         &boot_cmdline,
-    ).unwrap();
+    )
+    .unwrap();
     let entry_addr = kernel_entry.kernel_load;
     arch::x86_64::configure_system(
         &guest_memory,
@@ -143,7 +150,8 @@ pub fn boot_kernel(
         boot_cmdline.as_str().len() + 1,
         &initrd,
         1,
-    ).unwrap();
+    )
+    .unwrap();
 
     // serial device
     let mut io_bus = IoBus::new();
@@ -153,7 +161,9 @@ pub fn boot_kernel(
     let stdio_serial = Arc::new(Mutex::new(SerialDevice {
         serial: serial::Serial::with_events(
             com_evt_1_3.try_clone().unwrap(),
-            SerialEventsWrapper { buffer_read_event_fd: None },
+            SerialEventsWrapper {
+                buffer_read_event_fd: None,
+            },
             Box::new(std::io::stdout()),
         ),
     }));
@@ -179,18 +189,19 @@ pub fn boot_kernel(
         id as u64,
         num_cpus as u64,
         &mut kvm_cpuid,
-    ).unwrap();
+    )
+    .unwrap();
 
     let barrier = vcpu_thread_barrier.clone();
     let vcpu_exit_evt = exit_evt.try_clone().unwrap();
-    vcpu_handles.push(std::thread::Builder::new()
-        .name(String::from("vcpu_0"))
-        .spawn(move || {
-            barrier.wait();
-            loop {
-                match vcpu.run() {
-                    Ok(run) => {
-                        match run {
+    vcpu_handles.push(
+        std::thread::Builder::new()
+            .name(String::from("vcpu_0"))
+            .spawn(move || {
+                barrier.wait();
+                loop {
+                    match vcpu.run() {
+                        Ok(run) => match run {
                             VcpuExit::IoIn(addr, data) => {
                                 io_bus.read(addr as u64, data);
                             }
@@ -199,7 +210,7 @@ pub fn boot_kernel(
                             }
                             VcpuExit::MmioRead(addr, data) => {
                                 mmio_bus.read(addr, data);
-                            },
+                            }
                             VcpuExit::MmioWrite(addr, data) => {
                                 mmio_bus.write(addr, data);
                             }
@@ -212,27 +223,29 @@ pub fn boot_kernel(
                             _ => {
                                 println!("unexpected exit reason");
                                 break;
-                           }
+                            }
+                        },
+                        Err(e) => {
+                            println!("vcpu hit unknown error: {:?}", e);
+                            break;
                         }
                     }
-                    Err(e) => {
-                        println!("vcpu hit unknown error: {:?}", e);
+                    if kill_signaled.load(Ordering::SeqCst) {
                         break;
                     }
                 }
-                if kill_signaled.load(Ordering::SeqCst) {
-                    break;
-                }
-            }
-            vcpu_exit_evt.write(1).expect("failed to signal vcpu exit eventfd");
-        }).unwrap()
+                vcpu_exit_evt
+                    .write(1)
+                    .expect("failed to signal vcpu exit eventfd");
+            })
+            .unwrap(),
     );
 
     // run vcpu threads!
     vcpu_thread_barrier.wait();
 
     use vmm_sys_util::{
-        poll::{PollToken, PollContext, PollEvents},
+        poll::{PollContext, PollEvents, PollToken},
         terminal::Terminal,
     };
     #[derive(Debug, Clone, Copy)]
@@ -257,7 +270,9 @@ pub fn boot_kernel(
 
     let stdin_handle = io::stdin();
     let stdin_lock = stdin_handle.lock();
-    stdin_lock.set_raw_mode().expect("failed to set terminal raw mode");
+    stdin_lock
+        .set_raw_mode()
+        .expect("failed to set terminal raw mode");
     defer! {{
         if let Err(e) = stdin_lock.set_canon_mode() {
             println!("cannot set canon mode for stdin: {:?}", e);
@@ -270,18 +285,12 @@ pub fn boot_kernel(
     unsafe { events.set_len(EPOLL_EVENT_LEN) };
     let epoll_raw_fd = epoll_context.epoll_raw_fd;
     'poll: loop {
-        let num_events = ep::wait(
-            epoll_raw_fd,
-            -1,
-            &mut events[..],
-        ).unwrap();
+        let num_events = ep::wait(epoll_raw_fd, -1, &mut events[..]).unwrap();
         for i in 0..num_events {
             let dispatch_idx = events[i].data() as usize;
             let dispatch_type = epoll_context.dispatch_table[dispatch_idx];
             match dispatch_type {
-                epoll::EpollDispatch::Exit => {
-                    break 'poll
-                }
+                epoll::EpollDispatch::Exit => break 'poll,
                 epoll::EpollDispatch::Stdin => {
                     let mut out = [0u8; 64];
                     match stdin_lock.read_raw(&mut out[..]) {
@@ -292,7 +301,8 @@ pub fn boot_kernel(
                                 ep::EPOLL_CTL_DEL,
                                 libc::STDIN_FILENO,
                                 events[i],
-                            ).unwrap();
+                            )
+                            .unwrap();
                         }
                         Ok(count) => {
                             stdio_serial
@@ -330,20 +340,15 @@ pub fn build(
 
     let boot_config = vm_resources.boot_source().ok_or(MissingKernelConfig)?;
     let track_dirty_page = vm_resources.track_dirty_pages();
-    let guest_memory = create_guest_memory(
-        vm_resources.vm_config().mem_size_mib,
-        track_dirty_page,
-    )?;
+    let guest_memory =
+        create_guest_memory(vm_resources.vm_config().mem_size_mib, track_dirty_page)?;
     let vcpu_config = vm_resources.vcpu_config();
     let entry_addr = load_kernel(boot_config, &guest_memory)?;
     let initrd = load_initrd_from_config(boot_config, &guest_memory)?;
     let mut boot_cmdline = linux_loader::cmdline::Cmdline::new(arch::CMDLINE_MAX_SIZE);
 
-    let (mut vmm, mut vcpus) = create_vmm_and_vcpus(
-        guest_memory,
-        track_dirty_page,
-        vcpu_config.vcpu_count,
-    )?;
+    let (mut vmm, mut vcpus) =
+        create_vmm_and_vcpus(guest_memory, track_dirty_page, vcpu_config.vcpu_count)?;
 
     let init_and_regular = boot_config
         .cmdline
@@ -352,7 +357,7 @@ pub fn build(
         .collect::<Vec<&str>>();
     if init_and_regular.len() > 2 {
         return Err(StartVmError::KernelCmdline(
-                "Too many `--` in kernel cmdline.".to_string(),
+            "Too many `--` in kernel cmdline.".to_string(),
         ));
     }
     let boot_args = init_and_regular[0];
@@ -405,7 +410,8 @@ pub fn load_kernel(
         None,
         &mut kernel_file,
         Some(GuestAddress(arch::x86_64::get_kernel_start())),
-    ).map_err(StartVmError::KernelLoader)?;
+    )
+    .map_err(StartVmError::KernelLoader)?;
     // let entry_addr = Loader::load::<File, memory::GuestMemoryMmap>(
     //     guest_memory,
     //     Some(GuestAddress(arch::x86_64::get_kernel_start())),
@@ -430,11 +436,23 @@ fn load_initrd_from_config(
     })
 }
 
+fn load_initrd_from_image(
+    vm_memory: &memory::GuestMemoryMmap,
+    image: Option<&mut File>,
+) -> std::result::Result<Option<InitrdConfig>, StartVmError> {
+    Ok(match image {
+        Some(f) => Some(load_initrd(&vm_memory, f)?),
+        None => None,
+    })
+}
+
 fn load_initrd<F>(
     vm_memory: &memory::GuestMemoryMmap,
     image: &mut F,
 ) -> std::result::Result<InitrdConfig, StartVmError>
-where F: Read + Seek {
+where
+    F: Read + Seek,
+{
     let size: usize;
     // Get image size
     match image.seek(SeekFrom::End(0)) {
@@ -448,10 +466,11 @@ where F: Read + Seek {
         Ok(s) => size = s as usize,
     };
     // Go back to the image start
-    image.seek(SeekFrom::Start(0)).map_err(StartVmError::InitrdRead)?;
+    image
+        .seek(SeekFrom::Start(0))
+        .map_err(StartVmError::InitrdRead)?;
     // Get the target address
-    let address = arch::initrd_load_addr(vm_memory, size)
-        .map_err(|_| StartVmError::InitrdLoad)?;
+    let address = arch::initrd_load_addr(vm_memory, size).map_err(|_| StartVmError::InitrdLoad)?;
 
     // Load the image into memory
     //   - read_from is defined as trait methods of Bytes<A>
@@ -461,7 +480,7 @@ where F: Read + Seek {
         .read_from(GuestAddress(address), image, size)
         .map_err(|_| StartVmError::InitrdLoad)?;
 
-    Ok(InitrdConfig{
+    Ok(InitrdConfig {
         address: GuestAddress(address),
         size,
     })
@@ -506,7 +525,8 @@ pub fn create_guest_memory(
             .map(|(addr, size)| (None, *addr, *size))
             .collect::<Vec<_>>()[..],
         track_dirty_pages,
-    ).map_err(StartVmError::GuestMemoryMmap)
+    )
+    .map_err(StartVmError::GuestMemoryMmap)
 }
 
 fn configure_system_for_boot(
@@ -535,18 +555,19 @@ fn configure_system_for_boot(
             vmm.guest_memory(),
             GuestAddress(arch::x86_64::CMDLINE_START),
             &boot_cmdline,
-        ).map_err(LoadCommandline)?;
+        )
+        .map_err(LoadCommandline)?;
         arch::x86_64::configure_system(
             &vmm.guest_memory,
             GuestAddress(arch::x86_64::CMDLINE_START),
             boot_cmdline.as_str().len() + 1,
             initrd,
             vcpus.len() as u8,
-        ).map_err(ConfigureSystem)?;
+        )
+        .map_err(ConfigureSystem)?;
     }
     Ok(())
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}

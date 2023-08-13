@@ -40,7 +40,11 @@ fn main() {
                 .value_name("FILE"))
             .arg(Arg::new("boot-cmdline")
                 .short('c')
-                .value_name("BOOT_CMD_LINE")))
+                .value_name("BOOT_CMD_LINE"))
+            .arg(Arg::new("root-dev")
+                .short('r')
+                .value_name("ROOT DEVICE"))
+            )
         .get_matches();
 
     let verify_root = || if !getuid().is_root() {
@@ -72,7 +76,23 @@ fn main() {
         };
         let mut boot_cmdline = linux_loader::cmdline::Cmdline::new(0x10000);
         boot_cmdline.insert_str(boot_args).unwrap();
-        toyvmm::builder::boot_kernel(&mut kernel_file, &mut initrd_file, &mut boot_cmdline)
+        let rootdev = match matches.value_of("root-dev") {
+            Some(b) => {
+                Some(std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(b)
+                    .unwrap()
+                )
+            },
+            None => None,
+        };
+        toyvmm::builder::boot_kernel(
+            &mut kernel_file,
+            &mut initrd_file,
+            rootdev,
+            &mut boot_cmdline,
+        )
     }
 }
 

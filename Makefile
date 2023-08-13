@@ -6,6 +6,7 @@ IMAGE_TAG := 0.0.1
 DOCKER_IMAGE := aztecher/toyvmm:${IMAGE_TAG}
 KERNEL_FILE := vmlinux.bin
 INITRD_FILE := initrd.img
+ROOT_DISK := disk
 
 DEFAULT_TARGET := help
 
@@ -30,10 +31,11 @@ run_lwn_container: docker-image
 		sh -c 'cd toyvmm; cargo run -- lwn_sample; rm -rf target'
 
 run_linux: ## Execute Linux kernel (Require vmlinux.bin, initrd.img in this directory)
-	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE}
+	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE} -r ${ROOT_DISK}
 
 run_linux_debug:
-	sudo -E strace -y -e epoll_create,epoll_ctl,epoll_wait cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE}
+	sudo -E strace -y -e epoll_create,epoll_ctl,epoll_wait cargo run -- \
+		boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE} -r ${ROOT_DISK}
 
 # run_linux_virt:
 # 	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i initrd.img-5.4.0-139-generic

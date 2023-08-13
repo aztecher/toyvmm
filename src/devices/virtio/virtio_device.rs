@@ -52,7 +52,7 @@ pub trait VirtioDevice: Send {
     }
 
     /// Writes to this device configuration space at `offset`
-    fn write_config(&self, offset: u64, data: &[u8]) {
+    fn write_config(&mut self, offset: u64, data: &[u8]) {
         let _ = offset;
         let _ = data;
     }
