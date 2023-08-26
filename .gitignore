@@ -19,3 +19,4 @@ target/
 
 vmlinux.bin
 initrd.img
+ubuntu-18.04.ext4

@@ -1,0 +1,13 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2021"
+authors = ["aztecher <mikiyaf.business@gmail.com>"]
+description = "ToyVMM is a project being developed for the purpose of learning virtualization technology"
+license = "MIT"
+
+[lib]
+bench = false
+
+[dependencies]
+vmm-sys-util = "0.11.1"

@@ -1,0 +1,17 @@
+{
+	"boot-source": {
+		"kernel_path": "./vmlinux.bin",
+		"boot_args": "console=ttyS0 reboot=k panic=1"
+	},
+	"drives": [
+		{
+			"path_on_host": "./ubuntu-18.04.ext4",
+			"is_root_device": true
+		}
+	],
+	"machine-config": {
+		"vcpu_count": 1,
+		"mem_size_mib": 2048,
+		"track_dirty_page": false
+	}
+}
