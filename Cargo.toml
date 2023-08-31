@@ -1,20 +1,3 @@
-[package]
-name = "toyvmm"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-libc = ">=0.2.80"
-kvm-bindings = { version = ">=0.5.0", features = ["fam-wrappers"] }
-kvm-ioctls = ">=0.11.0"
-vmm-sys-util = ">=0.9.0"
-vm-memory = { version = ">= 0.7.0", features = ["backend-mmap", "backend-bitmap"] }
-linux-loader = ">=0.4.0"
-serde = { version = ">=1.0.27", features = ["derive"] }
-serde_json = "1.0.9"
-vm-superio = ">= 0.6.0"
-
-clap = "3.0.0-beta.2"
-nix = "0.9.0"
+[workspace]
+members = ["src/toyvmm"]
+default-members = ["src/toyvmm"]

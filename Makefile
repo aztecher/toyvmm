@@ -1,48 +1,52 @@
-#!/usr/bin/make -f
+.PHONY: all
+all: help
 
-CARGO := cargo
+DEVTOOL="tools/devtool.sh"
 
-IMAGE_TAG := 0.0.1
-DOCKER_IMAGE := aztecher/toyvmm:${IMAGE_TAG}
-KERNEL_FILE := vmlinux.bin
-INITRD_FILE := initrd.img
+##@ General
 
-DEFAULT_TARGET := help
+# The help target prints out all targets with their descriptions organized
+# beneath their categories. The categories are represented by '##@' and the
+# target descriptions by '##'. The awk commands is responsible for reading the
+# entire set of makefiles included in this invocation, looking for lines of the
+# file as xyz: ## something, and then pretty-format the target and help. Then,
+# if there's a line with ##@ something, that gets pretty-printed as a category.
+# More info on the usage of ANSI control characters for terminal formatting:
+# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
+# More info on the awk command:
+# http://linuxcommand.org/lc3_adv_awk.php
 
-# list up all targets
-ALL_TARGET := filename
+.PHONY: help
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-target: $(DEFAULT_TARGET) ## help
+##@ Development
 
-all: $(ALL_TARGET) ## Make all files
+.PHONY: setfacl
+	@sudo setfacl -m u:${USER}:rw /dev/kvm
 
-docker-image: ## Build docker image
-	docker build -t ${DOCKER_IMAGE} .
+.PHONY: setfacl test-no-priv
+test-no-priv:
+	@eval $(DEVTOOL) test-no-priv
 
-run_lwn: ## Execute LWN sample
-	sudo -E cargo run -- lwn_sample
-	sudo rm -rf target
+.PHONY: test-priv
+test-priv:
+	@eval $(DEVTOOL) test-priv
 
-run_lwn_container: docker-image
-	docker run --rm --device=/dev/kvm \
-		--security-opt seccomp=unconfined \
-		--volume `pwd`:/toyvmm -it ${DOCKER_IMAGE} \
-		sh -c 'cd toyvmm; cargo run -- lwn_sample; rm -rf target'
+.PHONY: test
+test: setfacl ## Test toyvmm
+	@eval $(DEVTOOL) test-all
 
-run_linux: ## Execute Linux kernel (Require vmlinux.bin, initrd.img in this directory)
-	sudo -E cargo run -- boot_kernel -k ${KERNEL_FILE} -i ${INITRD_FILE}
+##@ Build
 
-test: ## Execute cargo test
-	sudo -E cargo test -- --nocapture
-	sudo rm -rf target
+.PHONY: lint
+lint: ## Lint
+	@cargo clippy
 
-test_container: docker-image ## Execute cargo test in container
-	docker run --rm --device=/dev/kvm \
-		--security-opt seccomp=unconfined \
-		--volume `pwd`:/toyvmm -it ${DOCKER_IMAGE} \
-		sh -c 'cd toyvmm; cargo test; rm -rf target'
+.PHONY: fmt
+fmt: ## Format
+	@cargo fmt --all -- --check
 
-.PHONT: help
-help:
-	@grep -E '^[a-zA-Z_-]+:.*##.*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*##"}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
-
+.PHONY: build
+build: lint fmt ## Build toyvmm
+	@cargo build

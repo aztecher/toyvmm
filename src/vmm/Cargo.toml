@@ -1,0 +1,30 @@
+[package]
+name = "vmm"
+version = "0.1.0"
+edition = "2021"
+authors = ["aztecher <mikiyaf.business@gmail.com>"]
+description = "ToyVMM is a project being developed for the purpose of learning virtualization technology"
+license = "MIT"
+
+[lib]
+bench = false
+
+[dependencies]
+libc = ">=0.2.80"
+epoll = "=2.1.0"
+scopeguard = "=0.3.3"
+kvm-bindings = { version = ">=0.5.0", features = ["fam-wrappers"] }
+kvm-ioctls = ">=0.11.0"
+vmm-sys-util = ">=0.9.0"
+vm-memory = { version = "= 0.11.0", features = ["backend-mmap", "backend-bitmap"] }
+linux-loader = "=0.9.0"
+serde = { version = "=1.0.136", features = ["derive"] }
+serde_json = "1.0.79"
+vm-superio = ">= 0.6.0"
+byteorder = "=1.2.1"
+nix = "0.9.0"
+
+thiserror = "1.0.47"
+derive_more = { version = "0.99.17", default-features = false, features = ["from", "display"] }
+
+utils = { path = "../utils" }
