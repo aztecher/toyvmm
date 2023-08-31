@@ -22,7 +22,10 @@ help: ## Display this help.
 
 ##@ Development
 
-.PHONY: test-no-priv
+.PHONY: setfacl
+	@sudo setfacl -m u:${USER}:rw /dev/kvm
+
+.PHONY: setfacl test-no-priv
 test-no-priv:
 	@eval $(DEVTOOL) test-no-priv
 
@@ -31,7 +34,7 @@ test-priv:
 	@eval $(DEVTOOL) test-priv
 
 .PHONY: test
-test: ## Test toyvmm
+test: setfacl ## Test toyvmm
 	@eval $(DEVTOOL) test-all
 
 ##@ Build

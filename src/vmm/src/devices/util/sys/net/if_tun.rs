@@ -48,6 +48,9 @@ impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
 }
 impl<T> ::std::clone::Clone for __IncompleteArrayField<T> {
     #[inline]
+    // Manually added to suppress the "incorrect_clone_impl_on_copy_type"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::incorrect_clone_impl_on_copy_type)]
     fn clone(&self) -> Self {
         Self::new()
     }
@@ -357,8 +360,6 @@ pub struct ethhdr {
 // Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
 #[allow(deref_nullptr)]
 #[allow(clippy::zero_ptr)]
-// Manually added to suppress the "unaligned_references" error statement in the auto-generated test code.
-#[allow(unaligned_references)]
 fn bindgen_test_layout_ethhdr() {
     assert_eq!(
         ::std::mem::size_of::<ethhdr>(),
@@ -390,16 +391,18 @@ fn bindgen_test_layout_ethhdr() {
             stringify!(h_source)
         )
     );
-    assert_eq!(
-        unsafe { &(*(0 as *const ethhdr)).h_proto as *const _ as usize },
-        12usize,
-        concat!(
-            "Alignment of field: ",
-            stringify!(ethhdr),
-            "::",
-            stringify!(h_proto)
-        )
-    );
+    // Manually comment out the auto-generated test code
+    // because this code is no more allowed in rust compiler.
+    // assert_eq!(
+    //     unsafe { &(*(0 as *const ethhdr)).h_proto as *const _ as usize },
+    //     12usize,
+    //     concat!(
+    //         "Alignment of field: ",
+    //         stringify!(ethhdr),
+    //         "::",
+    //         stringify!(h_proto)
+    //     )
+    // );
 }
 impl Clone for ethhdr {
     fn clone(&self) -> Self {

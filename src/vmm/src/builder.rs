@@ -524,7 +524,7 @@ pub fn build_and_boot_vm(mut vm_resources: resources::VmResources) -> Result<(),
 
     // Run vCpu / Stdio Thread
     let num_cpus = 1;
-    let mut vcpu_handles = Vec::with_capacity(num_cpus as usize);
+    let mut vcpu_handles = Vec::with_capacity(num_cpus);
     let mut vcpu_thread_barrier = Arc::new(Barrier::new(num_cpus + 1));
     run_vcpus(vcpu, &vmm, &mut vcpu_handles, &mut vcpu_thread_barrier)?;
     run_epoll_thread(&vmm.pio_device_manager, &mut epoll_context)?;

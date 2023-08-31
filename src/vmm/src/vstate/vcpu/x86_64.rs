@@ -58,7 +58,7 @@ impl KvmVcpu {
         cpuid: &mut CpuId,
     ) -> Result<(), KvmVcpuConfigureError> {
         arch::x86_64::setup_cpuid(&self.fd, cpu_idx, num_cpus, cpuid);
-        arch::x86_64::setup_regs(&self.fd, kernel_start_addr.raw_value() as u64)
+        arch::x86_64::setup_regs(&self.fd, kernel_start_addr.raw_value())
             .map_err(KvmVcpuConfigureError::RegsConfiguration)?;
         arch::x86_64::setup_sregs(&self.fd, guest_memory)
             .map_err(KvmVcpuConfigureError::RegsConfiguration)?;

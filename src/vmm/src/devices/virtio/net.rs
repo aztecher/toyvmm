@@ -202,7 +202,7 @@ impl NetEpollHandler {
                 }
             }
 
-            let write_result = self.tap.write(&frame[..read_count as usize]);
+            let write_result = self.tap.write(&frame[..read_count]);
             match write_result {
                 Ok(_) => {}
                 Err(e) => {

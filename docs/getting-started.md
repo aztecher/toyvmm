@@ -3,9 +3,7 @@
 ## Architecture & OS
 
 ToyVMM only supports **x86_64** Linux for Guest OS.  
-
-ToyVMM has been confirmed to work with Rocky Linux 9 as the Hypervisor OS.  
-However, we believe it will also work on other Linux distributions such as Ubuntu.
+ToyVMM has been confirmed to work with Rocky Linux 8.6, 9.1 and Ubuntu 18.04 as the Hypervisor OS.  
 
 ## Prerequisites
 
@@ -41,8 +39,8 @@ Now it recognizes the ubuntu18.04.ext4 disk image as a block device and mounts i
 
 ```bash
 lsblk
-NAME MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
-vda  254:0    0  384M  0 disk /
+> NAME MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+> vda  254:0    0  384M  0 disk /
 ```
 
 Therefore, if you create a file in the VM and then recreate the VM using the same image, the file you created will be found.
@@ -52,7 +50,7 @@ This behavior is significantly different from a initramfs (rootfs that is extrac
 # Create 'hello.txt' in VM.
 echo "hello virtual machine" > hello.txt
 cat hello.txt
-hello virtual machine
+> hello virtual machine
 
 # Rebooting will cause the ToyVMM process to terminate.
 reboot -f
@@ -60,7 +58,7 @@ reboot -f
 # In the host, please restart VM and login again.
 # Afterward, you can found the file you created in the VM during its previous run.
 cat hello.txt
-hello virtual machine
+> hello virtual machine
 ```
 
 ## Network I/O in Virtual Mahcine.
@@ -70,16 +68,16 @@ Now, it recognizes the `eth0` network interface.
 
 ```bash
 ip link show eth0
-2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
-    link/ether 52:5f:7f:b3:f8:81 brd ff:ff:ff:ff:ff:ff
+> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+>     link/ether 52:5f:7f:b3:f8:81 brd ff:ff:ff:ff:ff:ff
 ```
 
 And toyvmm creates the host-side tap device named `vmtap0` that connect to the virtual machine interface.
 
 ```bash
 ip link show vmtap0
-334: vmtap0: <BROADCAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
-    link/ether 26:e9:5c:02:3c:19 brd ff:ff:ff:ff:ff:ff
+> 334: vmtap0: <BROADCAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
+>     link/ether 26:e9:5c:02:3c:19 brd ff:ff:ff:ff:ff:ff
 ```
 
 Therefore, by assigning appropriate IP addresses to the interfaces on both the VM side and the Host side, communication can be established between the HV and the VM.

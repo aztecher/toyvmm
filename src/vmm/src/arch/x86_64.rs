@@ -211,9 +211,9 @@ pub fn setup_regs(vcpu: &VcpuFd, boot_ip: u64) -> Result<(), RegError> {
     let regs: kvm_regs = kvm_regs {
         rflags: 0x0000_0000_0000_0002u64,
         rip: boot_ip,
-        rsp: BOOT_STACK_POINTER as u64,
-        rbp: BOOT_STACK_POINTER as u64,
-        rsi: ZERO_PAGE_START as u64,
+        rsp: BOOT_STACK_POINTER,
+        rbp: BOOT_STACK_POINTER,
+        rsi: ZERO_PAGE_START,
         ..Default::default()
     };
 
@@ -254,7 +254,7 @@ fn configure_segments_and_sregs(
     sregs: &mut kvm_sregs,
     mem: &GuestMemoryMmap,
 ) -> Result<(), RegError> {
-    let gdt_table: [u64; BOOT_GDT_MAX as usize] = [
+    let gdt_table: [u64; BOOT_GDT_MAX] = [
         gdt::gdt_entry(0, 0, 0),            // NULL
         gdt::gdt_entry(0xa09b, 0, 0xfffff), // CODE
         gdt::gdt_entry(0xc093, 0, 0xfffff), // DATA
@@ -285,11 +285,11 @@ fn configure_segments_and_sregs(
 
     // Write seguments
     write_gdt_table(&gdt_table[..], mem)?;
-    sregs.gdt.base = BOOT_GDT_OFFSET as u64;
+    sregs.gdt.base = BOOT_GDT_OFFSET;
     sregs.gdt.limit = mem::size_of_val(&gdt_table) as u16 - 1;
 
     write_idt_value(0, mem)?;
-    sregs.idt.base = BOOT_IDT_OFFSET as u64;
+    sregs.idt.base = BOOT_IDT_OFFSET;
     sregs.idt.limit = mem::size_of::<u64>() as u16 - 1;
 
     sregs.cs = code_seg;
@@ -312,10 +312,10 @@ fn setup_page_tables(sregs: &mut kvm_sregs, mem: &GuestMemoryMmap) -> Result<(),
     let boot_pde_addr = GuestAddress(PDE_START);
 
     // Entry converting VA [0..512GB)
-    mem.write_obj(boot_pdpte_addr.raw_value() as u64 | 0x03, boot_pml4_addr)
+    mem.write_obj(boot_pdpte_addr.raw_value() | 0x03, boot_pml4_addr)
         .map_err(RegError::WritePml4Address)?;
     // Entry covering VA [0..1GB)
-    mem.write_obj(boot_pde_addr.raw_value() as u64 | 0x03, boot_pdpte_addr)
+    mem.write_obj(boot_pde_addr.raw_value() | 0x03, boot_pdpte_addr)
         .map_err(RegError::WritePdpteAddress)?;
     // 512 MB entries together covering VA [0..1GB).
     // Note we are assuming CPU support 2MB pages (/proc/cpuinfo has 'pse').
@@ -323,7 +323,7 @@ fn setup_page_tables(sregs: &mut kvm_sregs, mem: &GuestMemoryMmap) -> Result<(),
         mem.write_obj((i << 21) + 0x83u64, boot_pde_addr.unchecked_add(i * 8))
             .map_err(RegError::WritePdeAddress)?;
     }
-    sregs.cr3 = boot_pml4_addr.raw_value() as u64;
+    sregs.cr3 = boot_pml4_addr.raw_value();
     sregs.cr4 |= X86_CR4_PAE;
     sregs.cr0 |= X86_CR0_PG;
     Ok(())
@@ -407,8 +407,8 @@ pub fn configure_system(
     if last_addr < end_32bit_gap_start {
         add_e820_entry(
             &mut params,
-            himem_start.raw_value() as u64,
-            last_addr.unchecked_offset_from(himem_start) as u64 + 1,
+            himem_start.raw_value(),
+            last_addr.unchecked_offset_from(himem_start) + 1,
             E820_RAM,
         )?;
     } else {

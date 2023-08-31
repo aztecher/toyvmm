@@ -48,6 +48,9 @@ impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
 }
 impl<T> ::std::clone::Clone for __IncompleteArrayField<T> {
     #[inline]
+    // Manually added to suppress the "incorrect_clone_impl_on_copy_type"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::incorrect_clone_impl_on_copy_type)]
     fn clone(&self) -> Self {
         Self::new()
     }
@@ -85,6 +88,9 @@ impl<T> ::std::default::Default for __BindgenUnionField<T> {
 }
 impl<T> ::std::clone::Clone for __BindgenUnionField<T> {
     #[inline]
+    // Manually added to suppress the "incorrect_clone_impl_on_copy_type"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::incorrect_clone_impl_on_copy_type)]
     fn clone(&self) -> Self {
         Self::new()
     }
