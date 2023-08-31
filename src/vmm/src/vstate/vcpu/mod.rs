@@ -144,133 +144,43 @@ impl Vcpu {
         self.kvm_vcpu.fd.run().map_err(VcpuError::VcpuRun)
     }
 
-    // pub fn run_arch_emulation(&self, exit: VcpuExit) -> Result<VcpuEmulation> {
-    //     let read = |bytes: &[u8]| -> String {
-    //         // String::from_utf8(bytes.to_vec()).unwrap()
-    //         bytes.iter().map(|&s| s as char).collect::<String>()
-    //     };
-    //     match exit {
-    //         VcpuExit::IoIn(_, data) => Ok(VcpuEmulation::Handled),
-    //         VcpuExit::IoOut(addr, data) => Ok(VcpuEmulation::Handled),
-    //         unexpected_exit => Err(Error::UnhandleKvmExit(format!("{:?}", unexpected_exit))),
-    //     }
-    // }
-
-    // pub fn emulate(&self) -> std::result::Result<VcpuExit, errno::Error> {
-    //     self.fd.run()
-    // }
-
-    // pub fn run_emulation(&self) -> Result<VcpuEmulation> {
-    //     let read = |bytes: &[u8]| -> String {
-    //         // String::from_utf8(bytes.to_vec()).unwrap()
-    //         bytes.iter().map(|&s| s as char).collect::<String>()
-    //     };
-    //     match self.emulate() {
-    //         Ok(run) => match run {
-    //             VcpuExit::MmioRead(addr, data) => {
-    //                 println!("MmioRead: {}", read(data));
-    //                 Ok(VcpuEmulation::Handled)
-    //             }
-    //             VcpuExit::MmioWrite(addr, data) => {
-    //                 println!("MmioWrite: {}", read(data));
-    //                 Ok(VcpuEmulation::Handled)
-    //             }
-    //             VcpuExit::Hlt => {
-    //                 println!("Hlt");
-    //                 Ok(VcpuEmulation::Stopped)
-    //             }
-    //             VcpuExit::Shutdown => {
-    //                 println!("Shutdown");
-    //                 Ok(VcpuEmulation::Stopped)
-    //             }
-    //             VcpuExit::FailEntry(reason, cpu) => {
-    //                 // TODO handle failure
-    //                 Err(Error::FaultyKvmExit(format!("{reason}, {cpu}")))
-    //             }
-    //             VcpuExit::InternalError => {
-    //                 // TODO handle failure
-    //                 Err(Error::FaultyKvmExit(format!(
-    //                     "{:?}",
-    //                     VcpuExit::InternalError
-    //                 )))
-    //             }
-    //             VcpuExit::SystemEvent(event_type, event_flags) => match event_type {
-    //                 KVM_SYSTEM_EVENT_RESET | KVM_SYSTEM_EVENT_SHUTDOWN => {
-    //                     // TODO
-    //                     println!("KVM_SYSTEM_EVENT_RESET | KVM_SYSTEM_EVENT_SHUTDOWN");
-    //                     Ok(VcpuEmulation::Stopped)
-    //                 }
-    //                 _ => {
-    //                     // TODO
-    //                     Err(Error::FaultyKvmExit(format!(
-    //                         "{:?}",
-    //                         VcpuExit::SystemEvent(event_type, event_flags)
-    //                     )))
-    //                 }
-    //             },
-    //             arch_specific_reason => self.run_arch_emulation(arch_specific_reason),
-    //         },
-    //         Err(ref e) => {
-    //             match e.errno() {
-    //                 libc::EAGAIN => {
-    //                     println!("libc::EAGAIN");
-    //                     Ok(VcpuEmulation::Handled)
-    //                 }
-    //                 libc::EINTR => {
-    //                     // TODO
-    //                     println!("libc::EINTER");
-    //                     Ok(VcpuEmulation::Interrupted)
-    //                 }
-    //                 libc::ENOSYS => Err(Error::FaultyKvmExit(
-    //                     "Received ENOSYS error because KVM failed to emulate an instruction."
-    //                         .to_string(),
-    //                 )),
-    //                 _ => {
-    //                     // TODO
-    //                     Err(Error::FaultyKvmExit(format!("{}", e)))
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn fd(&self) -> &VcpuFd {
         &self.kvm_vcpu.fd
     }
 }
 
-// #[cfg(test)]
-// pub(crate) mod tests {
-//     use super::*;
-//     use crate::kvm::vm::tests::{setup_vm, setup_vm_with_mem};
-//
-//     #[test]
-//     fn test_new() {
-//         let vm = setup_vm();
-//         assert!(Vcpu::new(0, &vm).is_ok())
-//     }
-//
-//     // #[test]
-//     // fn test_setup_vcpu_memory() {
-//     //     let kvm = Kvm::new().expected("Failed to open /dev/kvm or unexpected error");
-//     //     let vm = Vm::new(&kvm).unwrap();
-//     //     let vcpu = Vcpu::new(0, &vm).unwrap();
-//     // }
-//
-//     // #[test]
-//     // fn test_run_emulation() {
-//     //     let (_vm, mut vcpu, _vm_mem) = setup_vcpu(0x1000);
-//     //     let res = vcpu.run_emulation();
-//     //     println!("res = {:?}", res);
-//     //     assert!(res.is_ok());
-//     //     assert_eq!(res.unwrap(), VcpuEmulation::Stopped);
-//     // }
-//
-//     // Auxiliary function being used throughout the tests.
-//     #[allow(unused_mut)]
-//     pub(crate) fn setup_vcpu(mem_size: usize) -> (Vm, Vcpu, GuestMemoryMmap) {
-//         let (mut vm, gm) = setup_vm_with_mem(mem_size);
-//         let vcpu = Vcpu::new(0, &vm).unwrap();
-//         (vm, vcpu, gm)
-//     }
-// }
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::vstate::memory;
+    use ::utils::eventfd::EventFd;
+
+    #[test]
+    fn test_vcpu_configure() {
+        {
+            let mut vm = Vm::new().unwrap();
+            let gm =
+                memory::create_guest_memory(&[(None, GuestAddress(0), 0x1000)], false).unwrap();
+            vm.memory_init(&gm, false).unwrap();
+            vm.setup_irqchip().unwrap();
+            let mut vcpu = Vcpu::new(0, &vm, EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap();
+            let mut kvm_cpuid = vm.supported_cpuid().clone();
+            assert!(vcpu
+                .configure(&gm, GuestAddress(0), 0, 1, &mut kvm_cpuid)
+                .is_err());
+        }
+
+        {
+            let mut vm = Vm::new().unwrap();
+            let gm =
+                memory::create_guest_memory(&[(None, GuestAddress(0), 128 << 20)], false).unwrap();
+            vm.memory_init(&gm, false).unwrap();
+            vm.setup_irqchip().unwrap();
+            let mut vcpu = Vcpu::new(0, &vm, EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap();
+            let mut kvm_cpuid = vm.supported_cpuid().clone();
+            assert!(vcpu
+                .configure(&gm, GuestAddress(0), 0, 1, &mut kvm_cpuid)
+                .is_ok());
+        }
+    }
+}

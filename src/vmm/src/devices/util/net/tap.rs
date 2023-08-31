@@ -190,3 +190,43 @@ impl AsRawFd for Tap {
         self.tap_file.as_raw_fd()
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::devices::util::sys::net as SysNetUtil;
+    use crate::devices::util::sys::virtio::net as SysVirtioNet;
+
+    #[test]
+    fn test_create_socket() {
+        assert!(create_socket().is_ok());
+    }
+
+    #[test]
+    fn test_tap_new() {
+        assert!(Tap::new().is_ok());
+    }
+
+    #[test]
+    fn test_priv_tap_set_offload() {
+        let tap = Tap::new().unwrap();
+        let flags = SysNetUtil::TUN_F_CSUM
+            | SysNetUtil::TUN_F_UFO
+            | SysNetUtil::TUN_F_TSO4
+            | SysNetUtil::TUN_F_TSO6;
+        assert!(tap.set_offload(flags).is_ok());
+    }
+
+    #[test]
+    fn test_priv_tap_enable() {
+        let tap = Tap::new().unwrap();
+        assert!(tap.enable().is_ok());
+    }
+
+    #[test]
+    fn test_priv_tap_set_vnet_hdr_size() {
+        let tap = Tap::new().unwrap();
+        let vnet_hdr_size = std::mem::size_of::<SysVirtioNet::virtio_net_hdr_v1>() as i32;
+        assert!(tap.set_vnet_hdr_size(vnet_hdr_size).is_ok());
+    }
+}

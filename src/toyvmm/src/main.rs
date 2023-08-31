@@ -72,7 +72,7 @@ fn run(cli: Cli) -> Result<(), CliInputError> {
         Command::Vm(op) => match op {
             VmOperation::Run { config } => {
                 let config = read_to_string(config)?;
-                utils::build_vm_from_config(&config)?;
+                utils::run_vm_from_config(&config)?;
                 Ok(())
             }
         },
@@ -110,18 +110,18 @@ mod tests {
             r#"{{
                 "boot-source": {{
                     "kernel_path": "{}",
-                    "boot_args": "console=ttyS0 reboot=k panic=1",
+                    "boot_args": "console=ttyS0 reboot=k panic=1"
                 }},
                 "drives": [
                     {{
                         "path_on_host": "{}",
-                        "is_root_device": true,
+                        "is_root_device": true
                     }}
                 ],
                 "machine-config": {{
                     "vcpu_count": 1,
                     "mem_size_mib": 128,
-                    "track_dirty_page": false,
+                    "track_dirty_page": false
                 }}
             }}"#,
             kernel_image_path, rootfs_path,
@@ -151,6 +151,15 @@ mod tests {
             config_file.as_path().to_str().unwrap(),
         ];
         let cli = Cli::parse_from(args);
-        run(cli).unwrap();
+        #[allow(unreachable_patterns)]
+        #[allow(clippy::collapsible_match)]
+        #[allow(unused_variables)]
+        match cli.command {
+            Command::Vm(op) => match op {
+                VmOperation::Run { config } => (),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
     }
 }

@@ -8,15 +8,13 @@ pub enum UtilsError {
     CreateVmResources(#[from] vmm::resources::ResourcesError),
     /// Failed to build Vm.
     #[error("Failed to build virtual machine: {0}")]
-    BuildVm(StartVmError),
+    BuildVm(#[from] StartVmError),
 }
 
-pub fn build_vm_from_config(config: &str) -> Result<(), UtilsError> {
+pub fn run_vm_from_config(config: &str) -> Result<(), UtilsError> {
     // Prepare resources from the given configuraiton file.
     let vm_resources = VmResources::from_json(config)?;
-    // TODO) EventManager setup
-
-    // TODO) EventManager instance is passed to build_vm_for_boot
+    // Run virtual machine from configuration file.
     build_and_boot_vm(vm_resources).map_err(UtilsError::BuildVm)?;
     Ok(())
 }

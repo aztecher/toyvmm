@@ -107,7 +107,11 @@ pub type __u64 = ::std::os::raw::c_ulonglong;
 pub struct __kernel_fd_set {
     pub fds_bits: [::std::os::raw::c_ulong; 16usize],
 }
+
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___kernel_fd_set() {
     assert_eq!(
         ::std::mem::size_of::<__kernel_fd_set>(),
@@ -163,6 +167,9 @@ pub struct __kernel_fsid_t {
     pub val: [::std::os::raw::c_int; 2usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___kernel_fsid_t() {
     assert_eq!(
         ::std::mem::size_of::<__kernel_fsid_t>(),
@@ -215,6 +222,9 @@ pub struct __kernel_sockaddr_storage {
     pub __bindgen_align: [u64; 0usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___kernel_sockaddr_storage() {
     assert_eq!(
         ::std::mem::size_of::<__kernel_sockaddr_storage>(),
@@ -285,6 +295,9 @@ pub struct in_addr {
     pub s_addr: __be32,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_in_addr() {
     assert_eq!(
         ::std::mem::size_of::<in_addr>(),
@@ -319,6 +332,9 @@ pub struct ip_mreq {
     pub imr_interface: in_addr,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ip_mreq() {
     assert_eq!(
         ::std::mem::size_of::<ip_mreq>(),
@@ -364,6 +380,9 @@ pub struct ip_mreqn {
     pub imr_ifindex: ::std::os::raw::c_int,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ip_mreqn() {
     assert_eq!(
         ::std::mem::size_of::<ip_mreqn>(),
@@ -419,6 +438,9 @@ pub struct ip_mreq_source {
     pub imr_sourceaddr: __be32,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ip_mreq_source() {
     assert_eq!(
         ::std::mem::size_of::<ip_mreq_source>(),
@@ -476,6 +498,9 @@ pub struct ip_msfilter {
     pub imsf_slist: [__be32; 1usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ip_msfilter() {
     assert_eq!(
         ::std::mem::size_of::<ip_msfilter>(),
@@ -549,6 +574,9 @@ pub struct group_req {
     pub gr_group: __kernel_sockaddr_storage,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_group_req() {
     assert_eq!(
         ::std::mem::size_of::<group_req>(),
@@ -593,6 +621,9 @@ pub struct group_source_req {
     pub gsr_source: __kernel_sockaddr_storage,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_group_source_req() {
     assert_eq!(
         ::std::mem::size_of::<group_source_req>(),
@@ -649,6 +680,9 @@ pub struct group_filter {
     pub gf_slist: [__kernel_sockaddr_storage; 1usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_group_filter() {
     assert_eq!(
         ::std::mem::size_of::<group_filter>(),
@@ -724,6 +758,9 @@ pub struct in_pktinfo {
     pub ipi_addr: in_addr,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_in_pktinfo() {
     assert_eq!(
         ::std::mem::size_of::<in_pktinfo>(),
@@ -780,6 +817,9 @@ pub struct sockaddr_in {
     pub __pad: [::std::os::raw::c_uchar; 8usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_sockaddr_in() {
     assert_eq!(
         ::std::mem::size_of::<sockaddr_in>(),

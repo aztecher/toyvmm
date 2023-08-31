@@ -8,8 +8,7 @@
 use super::gdt;
 use super::msr_index as msri;
 use crate::{
-    arch::Error as ArchError, builder::InitrdConfig, utils::byte_order,
-    vstate::memory::GuestMemoryMmap,
+    arch::ArchError, builder::InitrdConfig, utils::byte_order, vstate::memory::GuestMemoryMmap,
 };
 use kvm_bindings::{kvm_fpu, kvm_lapic_state, kvm_msr_entry, kvm_regs, kvm_sregs, CpuId, Msrs};
 use kvm_ioctls::VcpuFd;
@@ -433,7 +432,7 @@ pub fn configure_system(
         &BootParams::new(&params, GuestAddress(ZERO_PAGE_START)),
         guest_mem,
     )
-    .map_err(|_| ArchError::ZeroPageSetup)
+    .map_err(ArchError::ZeroPageSetup)
 }
 
 fn add_e820_entry(
@@ -441,7 +440,7 @@ fn add_e820_entry(
     addr: u64,
     size: u64,
     mem_type: u32,
-) -> super::Result<()> {
+) -> Result<(), ArchError> {
     if params.e820_entries >= params.e820_table.len() as u8 {
         return Err(ArchError::E820Configuration);
     }
@@ -450,4 +449,54 @@ fn add_e820_entry(
     params.e820_table[params.e820_entries as usize].type_ = mem_type;
     params.e820_entries += 1;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vstate::memory;
+    use linux_loader::loader::bootparam::boot_e820_entry;
+
+    #[test]
+    fn test_system_configuration_should_panic() {
+        let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 128 << 20)], false).unwrap();
+        let res = configure_system(&gm, GuestAddress(0), 0, &None, 1);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_add_e820_entry() {
+        let e820_map = [(boot_e820_entry {
+            addr: 0x1,
+            size: 4,
+            type_: 1,
+        }); 128];
+        let expected_params = boot_params {
+            e820_table: e820_map,
+            e820_entries: 1,
+            ..Default::default()
+        };
+        let mut params: boot_params = Default::default();
+        add_e820_entry(
+            &mut params,
+            e820_map[0].addr,
+            e820_map[1].size,
+            e820_map[2].type_,
+        )
+        .unwrap();
+        assert_eq!(
+            format!("{:?}", params.e820_table[0]),
+            format!("{:?}", expected_params.e820_table[0]),
+        );
+        assert_eq!(params.e820_entries, expected_params.e820_entries);
+
+        params.e820_entries = params.e820_table.len() as u8 + 1;
+        assert!(add_e820_entry(
+            &mut params,
+            e820_map[0].addr,
+            e820_map[0].size,
+            e820_map[0].type_,
+        )
+        .is_err());
+    }
 }

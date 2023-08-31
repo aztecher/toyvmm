@@ -130,3 +130,65 @@ impl MmioDeviceManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        builder::{setup_interrupt_controller, tests::cmdline_contains},
+        devices::virtio::{
+            queue::Queue,
+            virtio_device::{ActivateError, VirtioDevice},
+        },
+        vstate::{memory, vm::Vm},
+    };
+    use ::utils::eventfd::EventFd;
+    use vm_memory::GuestAddress;
+
+    struct DummyDevice {
+        dummy: u32,
+    }
+
+    impl DummyDevice {
+        pub fn new() -> Self {
+            DummyDevice { dummy: 0 }
+        }
+    }
+
+    impl VirtioDevice for DummyDevice {
+        fn device_type(&self) -> u32 {
+            self.dummy
+        }
+
+        fn queue_max_sizes(&self) -> &[u16] {
+            &[64]
+        }
+
+        fn activate(
+            &mut self,
+            _mem: GuestMemoryMmap,
+            _interrupt_evt: EventFd,
+            _status: Arc<std::sync::atomic::AtomicUsize>,
+            _queues: Vec<Queue>,
+            _queue_evt: Vec<EventFd>,
+        ) -> Result<(), ActivateError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_register_mmio_devices() {
+        let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 128 << 20)], false).unwrap();
+        let mut vm = Vm::new().unwrap();
+        vm.memory_init(&gm, false).unwrap();
+        setup_interrupt_controller(&mut vm).unwrap();
+        let mut dm = MmioDeviceManager::new(gm, 0x1000, 0, 5);
+        let dummy = Box::new(DummyDevice::new());
+        let mut cmdline = linux_loader::cmdline::Cmdline::new(4096).unwrap();
+        assert!(dm.register_mmio(dummy, &mut cmdline).is_ok());
+        assert!(cmdline_contains(
+            &cmdline,
+            "virtio_mmio.device=4K@0x00000000:5"
+        ));
+    }
+}

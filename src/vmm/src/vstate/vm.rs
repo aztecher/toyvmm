@@ -179,42 +179,30 @@ impl Vm {
     }
 }
 
-// #[cfg(test)]
-// pub(crate) mod tests {
-//     use super::*;
-//     use crate::kvm::memory::tests::create_anon_guest_memory;
-//
-//     pub(crate) fn setup_vm() -> Vm {
-//         let kvm = Kvm::new().expect("Failed to open /dev/kvm or unexpected error");
-//         Vm::new(&kvm).unwrap()
-//     }
-//
-//     // pub(crate) fn setup_vm_with_mem(mem_size: usize) -> (Vm, GuestMemoryMmap) {
-//     //     let kvm = Kvm::new().expect("Faled to open /dev/kvm or unexpected error");
-//     //     let gm = create_anon_guest_memory(&[(GuestAddress(0), mem_size)], false).unwrap();
-//     //     let vm = Vm::new(&kvm).expect("Cannot create new vm");
-//     //     (vm, gm)
-//     // }
-//
-//     #[test]
-//     fn test_new() {
-//         // check if fd is not from /dev/kvm then error
-//         use vmm_sys_util::tempfile::TempFile;
-//         let vm =
-//             Vm::new(&unsafe { Kvm::from_raw_fd(TempFile::new().unwrap().as_file().as_raw_fd()) });
-//         assert!(vm.is_err());
-//
-//         // check if fd from /dev/kvm is accepted
-//         let kvm = Kvm::new().expect("Failed to open /dev/kvm or unexpected error");
-//         assert!(Vm::new(&kvm).is_ok())
-//     }
-//
-//     #[test]
-//     fn test_vcpu_mmap_size() {
-//         let kvm = Kvm::new().expect("Failed to open /dev/kvm or unexpected error");
-//         let size = kvm
-//             .get_vcpu_mmap_size()
-//             .expect("Faield to get vcpu mmap size");
-//         assert_ne!(0, size)
-//     }
-// }
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::vstate::memory;
+    use vm_memory::GuestAddress;
+
+    #[test]
+    fn test_memory_init() {
+        let mut vm = Vm::new().unwrap();
+        let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 0x1000)], false).unwrap();
+        assert!(vm.memory_init(&gm, false).is_ok());
+    }
+
+    #[test]
+    fn test_set_kvm_memory_regions() {
+        let vm = Vm::new().unwrap();
+        let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 0x1000)], false).unwrap();
+        assert!(vm.set_kvm_memory_regions(&gm, false).is_ok());
+
+        let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 0x10)], false).unwrap();
+        let res = vm.set_kvm_memory_regions(&gm, false);
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "Cannot set memory resion: Invalid argument (os error 22)",
+        );
+    }
+}

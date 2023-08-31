@@ -83,32 +83,6 @@ impl EpollContext {
 
         dispatch_table.push(EpollDispatch::Stdin);
 
-        // ERROR... following code
-        // use vmm_sys_util::epoll;
-        // let mut dispatch_table = Vec::with_capacity(20);
-        // let device_handlers = Vec::with_capacity(6);
-        // let epoll_fd = epoll::Epoll::new().map_err(Error::EpollFd)?;
-        // epoll_fd.ctl(
-        //     epoll::ControlOperation::Add,
-        //     exit_evt_raw_fd,
-        //     epoll::EpollEvent::new(
-        //         epoll::EventSet::IN,
-        //         dispatch_table.len() as u64,
-        //     ),
-        // ).map_err(Error::EpollFd)?;
-        // dispatch_table.push(EpollDispatch::Exit);
-        //
-        // epoll_fd.ctl(
-        //     epoll::ControlOperation::Add,
-        //     libc::STDIN_FILENO, // TODO
-        //     epoll::EpollEvent::new(
-        //         epoll::EventSet::IN,
-        //         dispatch_table.len() as u64,
-        //     ),
-        // ).map_err(Error::EpollFd)?;
-        // dispatch_table.push(EpollDispatch::Stdin);
-        //
-        // let epoll_raw_fd = epoll_fd.as_raw_fd();
         Ok(EpollContext {
             epoll_raw_fd,
             dispatch_table,
@@ -139,6 +113,7 @@ impl EpollContext {
         virtio::net::EpollConfig::new(dispatch_base, self.epoll_raw_fd, sender)
     }
 
+    #[allow(clippy::toplevel_ref_arg)]
     pub fn get_device_handler(&mut self, device_idx: usize) -> &mut dyn EpollHandler {
         let ref mut maybe = self.device_handlers[device_idx];
         match maybe.handler {
@@ -161,6 +136,95 @@ impl Drop for EpollContext {
         let rc = unsafe { libc::close(self.epoll_raw_fd) };
         if rc != 0 {
             println!("warn: cannot close epoll");
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use ::utils::eventfd::EventFd;
+    use std::os::unix::io::AsRawFd;
+
+    fn create_epoll_context() -> EpollContext {
+        EpollContext::new(EventFd::new(libc::EFD_NONBLOCK).unwrap().as_raw_fd()).unwrap()
+    }
+
+    #[test]
+    pub fn test_epoll_context_new() {
+        let epoll_ctx = create_epoll_context();
+        assert_eq!(epoll_ctx.dispatch_table.len(), 2);
+        assert_eq!(epoll_ctx.device_handlers.len(), 0);
+        match epoll_ctx.dispatch_table.get(0).unwrap() {
+            EpollDispatch::Exit => (),
+            _ => unreachable!(),
+        }
+        match epoll_ctx.dispatch_table.get(1).unwrap() {
+            EpollDispatch::Stdin => (),
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    pub fn test_allocate_tokens() {
+        let mut epoll_ctx = create_epoll_context();
+        // Allocate tokens for virtio-blk
+        {
+            // allocate 1 token for device
+            let (dispatch_base, _) = epoll_ctx.allocate_tokens(2);
+            assert_eq!(epoll_ctx.dispatch_table.len(), 3);
+            assert_eq!(dispatch_base, 2);
+            match epoll_ctx
+                .dispatch_table
+                .get(dispatch_base as usize)
+                .unwrap()
+            {
+                EpollDispatch::DeviceHandler(device_idx, device_token) => {
+                    assert_eq!(device_idx, &0);
+                    assert_eq!(device_token, &0);
+                }
+                _ => unreachable!(),
+            }
+        }
+        // Allocate tokens for virtio-net (additionally)
+        {
+            // allocate 3 token for device
+            let (dispatch_base, _) = epoll_ctx.allocate_tokens(4);
+            assert_eq!(epoll_ctx.dispatch_table.len(), 6);
+            assert_eq!(dispatch_base, 3);
+            match epoll_ctx
+                .dispatch_table
+                .get(dispatch_base as usize)
+                .unwrap()
+            {
+                EpollDispatch::DeviceHandler(device_idx, device_token) => {
+                    assert_eq!(device_idx, &1);
+                    assert_eq!(device_token, &0);
+                }
+                _ => unreachable!(),
+            }
+            match epoll_ctx
+                .dispatch_table
+                .get(dispatch_base as usize + 1)
+                .unwrap()
+            {
+                EpollDispatch::DeviceHandler(device_idx, device_token) => {
+                    assert_eq!(device_idx, &1);
+                    assert_eq!(device_token, &1);
+                }
+                _ => unreachable!(),
+            }
+            match epoll_ctx
+                .dispatch_table
+                .get(dispatch_base as usize + 1)
+                .unwrap()
+            {
+                EpollDispatch::DeviceHandler(device_idx, device_token) => {
+                    assert_eq!(device_idx, &1);
+                    assert_eq!(device_token, &1);
+                }
+                _ => unreachable!(),
+            }
         }
     }
 }

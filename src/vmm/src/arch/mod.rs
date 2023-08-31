@@ -7,26 +7,35 @@ use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryRegion};
 
 pub const CMDLINE_MAX_SIZE: usize = 0x10000;
 
-#[derive(Debug, PartialEq)]
-pub enum Error {
+/// Errors associated with the architecture related operations.
+#[derive(Debug, thiserror::Error)]
+pub enum ArchError {
+    /// Initrd address is not found in configured guest memory.
+    #[error("Initrd address is not found in configured guest memory.")]
     InitrdAddress,
-    ZeroPageSetup,
+    /// Zero page setup error.
+    #[error("Zero page setup error: {0}")]
+    ZeroPageSetup(#[from] linux_loader::configurator::Error),
+    /// E820 table setup failure becauuse of the out-of-bounds.
+    #[error("E820 table setup failure because of the out-of-bounds.")]
     E820Configuration,
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
 pub const PAGE_SIZE: usize = 4096;
 
-pub fn initrd_load_addr(guest_mem: &memory::GuestMemoryMmap, initrd_size: usize) -> Result<u64> {
+pub fn initrd_load_addr(
+    guest_mem: &memory::GuestMemoryMmap,
+    initrd_size: usize,
+) -> Result<u64, ArchError> {
     // Find first region from guest address
     let first_region = guest_mem
         .find_region(GuestAddress::new(0))
-        .ok_or(Error::InitrdAddress)?;
+        .ok_or(ArchError::InitrdAddress)?;
     // Get first region length
     let lowmem_size = first_region.len() as usize;
     // Check if initrd size is lower than first region
     if lowmem_size < initrd_size {
-        return Err(Error::InitrdAddress);
+        return Err(ArchError::InitrdAddress);
     }
     // bit operation to align to pagesize
     // intuitively, we can get bellow converter
@@ -57,6 +66,8 @@ pub fn arch_memory_regions(size: usize) -> Vec<(GuestAddress, usize)> {
 
 #[cfg(test)]
 pub mod tests {
+    use super::*;
+
     #[test]
     fn test_align_to_pagesize() {
         let pagesize = 4096;
@@ -67,5 +78,21 @@ pub mod tests {
         assert_eq!(pagesize, align_to_pagesize(pagesize * 2 - 1) as u64);
         assert_eq!(pagesize * 2, align_to_pagesize(pagesize * 2) as u64);
         assert_eq!(pagesize * 2, align_to_pagesize(pagesize * 3 - 1) as u64);
+    }
+
+    #[test]
+    fn regions_lt_4gb() {
+        let regions = arch_memory_regions(1 << 29);
+        assert_eq!(1, regions.len());
+        assert_eq!(vm_memory::GuestAddress(0), regions[0].0);
+        assert_eq!(1 << 29, regions[0].1);
+    }
+
+    #[test]
+    fn regions_gt_4gb() {
+        let regions = arch_memory_regions((1 << 32) + 0x8000);
+        assert_eq!(2, regions.len());
+        assert_eq!(vm_memory::GuestAddress(0), regions[0].0);
+        assert_eq!(GuestAddress(1 << 32), regions[1].0);
     }
 }

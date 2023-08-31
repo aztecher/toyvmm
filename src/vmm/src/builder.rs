@@ -36,6 +36,7 @@ use utils::eventfd::EventFd;
 use vm_memory::{Bytes, GuestAddress};
 use vm_superio::serial;
 
+/// Errors associated with starting the instance.
 #[derive(Debug, thiserror::Error)]
 pub enum StartVmError {
     /// Invalid memory configuration.
@@ -85,7 +86,7 @@ pub struct InitrdConfig {
 }
 
 // TODO: unwrap -> Result<Arc..., XXXError>
-fn setup_stdio_serial_device() -> Arc<Mutex<SerialDevice>> {
+pub fn setup_stdio_serial_device() -> Arc<Mutex<SerialDevice>> {
     let interrupt_evt = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
     Arc::new(Mutex::new(SerialDevice {
         serial: serial::Serial::with_events(
@@ -98,7 +99,7 @@ fn setup_stdio_serial_device() -> Arc<Mutex<SerialDevice>> {
     }))
 }
 
-fn setup_interrupt_controller(vm: &mut Vm) -> Result<(), StartVmError> {
+pub fn setup_interrupt_controller(vm: &mut Vm) -> Result<(), StartVmError> {
     vm.setup_irqchip()
         .map_err(VmmError::Vm)
         .map_err(StartVmError::Internal)
@@ -116,6 +117,56 @@ fn load_kernel(
     )
     .map_err(StartVmError::KernelLoader)?;
     Ok(kernel_entry_addr.kernel_load)
+}
+
+fn load_initrd_from_resource(
+    vm_resources: &mut resources::VmResources,
+    vm_memory: &memory::GuestMemoryMmap,
+) -> Result<Option<InitrdConfig>, StartVmError> {
+    Ok(match vm_resources.boot_config_mut().initrd_file.as_mut() {
+        Some(f) => Some(load_initrd(vm_memory, f)?),
+        None => None,
+    })
+}
+
+fn load_initrd<F>(
+    vm_memory: &memory::GuestMemoryMmap,
+    image: &mut F,
+) -> std::result::Result<InitrdConfig, StartVmError>
+where
+    F: Read + Seek,
+{
+    let size: usize;
+    // Get image size
+    match image.seek(SeekFrom::End(0)) {
+        Err(e) => return Err(StartVmError::InitrdRead(e)),
+        Ok(0) => {
+            return Err(StartVmError::InitrdRead(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Initrd image seek returned a size of zero",
+            )))
+        }
+        Ok(s) => size = s as usize,
+    };
+    // Go back to the image start
+    image
+        .seek(SeekFrom::Start(0))
+        .map_err(StartVmError::InitrdRead)?;
+    // Get the target address
+    let address = arch::initrd_load_addr(vm_memory, size).map_err(|_| StartVmError::InitrdLoad)?;
+
+    // Load the image into memory
+    //   - read_from is defined as trait methods of Bytes<A>
+    //     and GuestMemoryMmap implements this trait.
+    // TODO: Explain arch::initrd_load_addr's return address is used in read_from ?
+    vm_memory
+        .read_from(GuestAddress(address), image, size)
+        .map_err(|_| StartVmError::InitrdLoad)?;
+
+    Ok(InitrdConfig {
+        address: GuestAddress(address),
+        size,
+    })
 }
 
 fn create_guest_memory(
@@ -143,13 +194,56 @@ fn create_vcpus(vm: &Vm, _vcpu_count: u8, exit_evt: &EventFd) -> Result<Vcpu, Vm
     Ok(vcpu)
 }
 
+fn create_vmm_and_vcpus(
+    guest_memory: memory::GuestMemoryMmap,
+    track_dirty_pages: bool,
+    vcpu_count: u8,
+) -> Result<(Vmm, Vcpu), StartVmError> {
+    let mut vm = Vm::new()
+        .map_err(VmmError::Vm)
+        .map_err(StartVmError::Internal)?;
+    vm.memory_init(&guest_memory, track_dirty_pages)
+        .map_err(VmmError::Vm)
+        .map_err(StartVmError::Internal)?;
+    setup_interrupt_controller(&mut vm)?;
+
+    let vcpu_exit_evt = EventFd::new(libc::EFD_NONBLOCK)
+        .map_err(VmmError::EventFd)
+        .map_err(StartVmError::Internal)?;
+    let vcpu = create_vcpus(&vm, vcpu_count, &vcpu_exit_evt).map_err(StartVmError::Internal)?;
+
+    // MMIO Device Manager
+    let mmio_device_manager =
+        MmioDeviceManager::new(guest_memory.clone(), 0x1000, arch::MMIO_MEM_START, 5);
+
+    // Legacy Device Manager
+    let mut pio_device_manager = PortIoDeviceManager::new(setup_stdio_serial_device())
+        .map_err(VmmError::LegacyIoBus)
+        .map_err(StartVmError::Internal)?;
+    pio_device_manager
+        .register_devices(vm.fd())
+        .map_err(VmmError::LegacyIoBus)
+        .map_err(StartVmError::Internal)?;
+
+    Ok((
+        Vmm {
+            vm,
+            guest_memory,
+            mmio_device_manager,
+            pio_device_manager,
+        },
+        vcpu,
+    ))
+}
+
 fn attach_block_devices(
     vm_resources: &mut resources::VmResources,
     epoll_ctx: &mut epoll::EpollContext,
     mmio_device_manager: &mut MmioDeviceManager,
 ) -> Result<(), StartVmError> {
-    let mut blocks = Vec::new();
-    for drive in vm_resources.block.devices.iter() {
+    let drives = vm_resources.block.devices.clone();
+    let boot_cmdline = vm_resources.cmdline_mut();
+    for drive in drives {
         // TODO: multiple root device validation is finished in vmresources and expected to be
         // sorted.
         let drive_file = File::options()
@@ -157,18 +251,16 @@ fn attach_block_devices(
             .write(true)
             .open(&drive.path_on_host)
             .map_err(StartVmError::OpenBlockDevice)?;
-        blocks.push(drive_file);
-    }
-    let boot_cmdline = vm_resources.cmdline_mut();
-    for (index, block) in blocks.into_iter().enumerate() {
-        if index == 0 {
+        // blocks.push(drive_file);
+        if drive.is_root_device {
             boot_cmdline
                 .insert_str(" root=/dev/vda")
                 .map_err(StartVmError::InsertCommandline)?;
         }
         let epoll_config = epoll_ctx.allocate_virtio_blk_token();
-        let block =
-            Box::new(Block::new(block, epoll_config).map_err(StartVmError::CreateBlockDevice)?);
+        let block = Box::new(
+            Block::new(drive_file, epoll_config).map_err(StartVmError::CreateBlockDevice)?,
+        );
         mmio_device_manager
             .register_mmio(block, boot_cmdline)
             .map_err(StartVmError::RegisterMmioDevice)?;
@@ -194,7 +286,6 @@ fn configure_system_for_boot(
     vmm: &Vmm,
     vcpu: &mut Vcpu,
     vm_resources: &resources::VmResources,
-    // vm_config: &machine_config::VmConfig,
     entry_addr: GuestAddress,
     initrd: &Option<InitrdConfig>,
     // boot_cmdline: &Cmdline,
@@ -448,97 +539,243 @@ pub fn build_and_boot_vm(mut vm_resources: resources::VmResources) -> Result<(),
     Ok(())
 }
 
-fn create_vmm_and_vcpus(
-    guest_memory: memory::GuestMemoryMmap,
-    track_dirty_pages: bool,
-    vcpu_count: u8,
-) -> Result<(Vmm, Vcpu), StartVmError> {
-    let mut vm = Vm::new()
-        .map_err(VmmError::Vm)
-        .map_err(StartVmError::Internal)?;
-    vm.memory_init(&guest_memory, track_dirty_pages)
-        .map_err(VmmError::Vm)
-        .map_err(StartVmError::Internal)?;
-    setup_interrupt_controller(&mut vm)?;
-
-    let vcpu_exit_evt = EventFd::new(libc::EFD_NONBLOCK)
-        .map_err(VmmError::EventFd)
-        .map_err(StartVmError::Internal)?;
-    let vcpu = create_vcpus(&vm, vcpu_count, &vcpu_exit_evt).map_err(StartVmError::Internal)?;
-
-    // MMIO Device Manager
-    let mmio_device_manager =
-        MmioDeviceManager::new(guest_memory.clone(), 0x1000, arch::MMIO_MEM_START, 5);
-
-    // Legacy Device Manager
-    let mut pio_device_manager = PortIoDeviceManager::new(setup_stdio_serial_device())
-        .map_err(VmmError::LegacyIoBus)
-        .map_err(StartVmError::Internal)?;
-    pio_device_manager
-        .register_devices(vm.fd())
-        .map_err(VmmError::LegacyIoBus)
-        .map_err(StartVmError::Internal)?;
-
-    Ok((
-        Vmm {
-            vm,
-            guest_memory,
-            mmio_device_manager,
-            pio_device_manager,
-        },
-        vcpu,
-    ))
-}
-
-fn load_initrd_from_resource(
-    vm_resources: &mut resources::VmResources,
-    vm_memory: &memory::GuestMemoryMmap,
-) -> Result<Option<InitrdConfig>, StartVmError> {
-    Ok(match vm_resources.boot_config_mut().initrd_file.as_mut() {
-        Some(f) => Some(load_initrd(vm_memory, f)?),
-        None => None,
-    })
-}
-
-fn load_initrd<F>(
-    vm_memory: &memory::GuestMemoryMmap,
-    image: &mut F,
-) -> std::result::Result<InitrdConfig, StartVmError>
-where
-    F: Read + Seek,
-{
-    let size: usize;
-    // Get image size
-    match image.seek(SeekFrom::End(0)) {
-        Err(e) => return Err(StartVmError::InitrdRead(e)),
-        Ok(0) => {
-            return Err(StartVmError::InitrdRead(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Initrd image seek returned a size of zero",
-            )))
-        }
-        Ok(s) => size = s as usize,
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::{
+        arch,
+        vmm_config::{boot_source, drive, machine_config},
     };
-    // Go back to the image start
-    image
-        .seek(SeekFrom::Start(0))
-        .map_err(StartVmError::InitrdRead)?;
-    // Get the target address
-    let address = arch::initrd_load_addr(vm_memory, size).map_err(|_| StartVmError::InitrdLoad)?;
+    use ::utils::tempfile::TempFile;
+    use std::io::Write;
 
-    // Load the image into memory
-    //   - read_from is defined as trait methods of Bytes<A>
-    //     and GuestMemoryMmap implements this trait.
-    // TODO: Explain arch::initrd_load_addr's return address is used in read_from ?
-    vm_memory
-        .read_from(GuestAddress(address), image, size)
-        .map_err(|_| StartVmError::InitrdLoad)?;
+    fn make_bin(size: usize) -> Vec<u8> {
+        let mut fake_bin = Vec::new();
+        fake_bin.resize(size, 0xAA);
+        fake_bin
+    }
 
-    Ok(InitrdConfig {
-        address: GuestAddress(address),
-        size,
-    })
+    fn make_test_bin() -> Vec<u8> {
+        make_bin(1_000_000)
+    }
+
+    fn make_test_large_bin() -> Vec<u8> {
+        make_bin(5 << 20)
+    }
+
+    fn default_kernel_cmdline() -> linux_loader::cmdline::Cmdline {
+        linux_loader::cmdline::Cmdline::try_from(
+            boot_source::DEFAULT_KERNEL_CMDLINE,
+            arch::CMDLINE_MAX_SIZE,
+        )
+        .unwrap()
+    }
+
+    fn make_test_vm_resources(
+        vm_config: machine_config::VmConfig,
+        boot_source: boot_source::BootSource,
+        block: drive::BlockDeviceBuilder,
+    ) -> resources::VmResources {
+        resources::VmResources {
+            vm_config,
+            boot_source,
+            block,
+        }
+    }
+
+    fn default_vm_resources_from_block(block: drive::BlockDeviceBuilder) -> resources::VmResources {
+        let vm_config = machine_config::VmConfig {
+            vcpu_count: 1,
+            mem_size_mib: 128,
+            track_dirty_page: false,
+        };
+        let boot_source_config = boot_source::BootSourceConfig {
+            kernel_path: String::new(),
+            initrd_path: None,
+            boot_args: None,
+        };
+        let boot_config = boot_source::BootConfig {
+            cmdline: default_kernel_cmdline(),
+            kernel_file: TempFile::new().unwrap().into_file(),
+            initrd_file: None,
+        };
+        let boot_source = boot_source::BootSource {
+            config: boot_source_config,
+            builder: Some(boot_config),
+        };
+        make_test_vm_resources(vm_config, boot_source, block)
+    }
+
+    fn default_vm_resources() -> resources::VmResources {
+        let block = drive::BlockDeviceBuilder {
+            devices: Vec::new(),
+        };
+        default_vm_resources_from_block(block)
+    }
+
+    fn default_mmio_device_manager() -> MmioDeviceManager {
+        MmioDeviceManager::new(
+            create_guest_memory(128, false).unwrap(),
+            0x1000,
+            arch::MMIO_MEM_START,
+            5,
+        )
+    }
+
+    pub fn cmdline_contains(cmdline: &linux_loader::cmdline::Cmdline, slug: &str) -> bool {
+        cmdline
+            .as_cstring()
+            .unwrap()
+            .into_string()
+            .unwrap()
+            .contains(slug)
+    }
+
+    #[test]
+    fn test_load_initrd() {
+        let image = make_test_bin();
+        let mem_size = image.len() * 2 + arch::PAGE_SIZE;
+        let tempfile = TempFile::new().unwrap();
+        let mut tempfile = tempfile.into_file();
+        tempfile.write_all(&image).unwrap();
+
+        let gm = create_guest_memory(mem_size, false).unwrap();
+        let res = load_initrd(&gm, &mut tempfile);
+        assert!(res.is_ok());
+        let initrd = res.unwrap();
+        assert_eq!(initrd.size, image.len())
+    }
+
+    #[test]
+    fn test_load_initrd_no_memory() {
+        let image = make_test_large_bin();
+        let gm = create_guest_memory(1, false).unwrap();
+        let tempfile = TempFile::new().unwrap();
+        let mut tempfile = tempfile.into_file();
+        tempfile.write_all(&image).unwrap();
+        let res = load_initrd(&gm, &mut tempfile);
+        assert!(res.is_err());
+        assert_eq!(
+            StartVmError::InitrdLoad.to_string(),
+            res.err().unwrap().to_string(),
+        );
+    }
+
+    #[test]
+    fn test_create_vcpus() {
+        // TODO: Now only support single vCPU, but will be support multi vCPU
+        let vcpu_count = 1;
+        let guest_memory = create_guest_memory(128, false).unwrap();
+        let mut vm = Vm::new().unwrap();
+        vm.memory_init(&guest_memory, false).unwrap();
+        let exit_evt = EventFd::new(libc::EFD_NONBLOCK).unwrap();
+        setup_interrupt_controller(&mut vm).unwrap();
+        assert!(create_vcpus(&vm, vcpu_count, &exit_evt).is_ok())
+    }
+
+    #[test]
+    fn test_attach_block_device() {
+        let mut epoll_context =
+            epoll::EpollContext::new(EventFd::new(libc::EFD_NONBLOCK).unwrap().as_raw_fd())
+                .unwrap();
+        // Non root block devices are added.
+        {
+            let mut mmio_device_manager = default_mmio_device_manager();
+            let tempfile = TempFile::new().unwrap();
+            let block_device_config = drive::BlockDeviceConfig {
+                path_on_host: tempfile.as_path().to_str().unwrap().to_string(),
+                is_root_device: false,
+            };
+            let block = drive::BlockDeviceBuilder {
+                devices: vec![block_device_config],
+            };
+            let mut vm_resources = default_vm_resources_from_block(block);
+            assert!(attach_block_devices(
+                &mut vm_resources,
+                &mut epoll_context,
+                &mut mmio_device_manager,
+            )
+            .is_ok());
+            assert!(!cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
+            assert!(cmdline_contains(
+                vm_resources.cmdline(),
+                "virtio_mmio.device=4K@0xd0000000:5"
+            ));
+        }
+
+        // Root block device is aded.
+        {
+            let mut mmio_device_manager = default_mmio_device_manager();
+            let tempfile = TempFile::new().unwrap();
+            let block_device_config = drive::BlockDeviceConfig {
+                path_on_host: tempfile.as_path().to_str().unwrap().to_string(),
+                is_root_device: true,
+            };
+            let block = drive::BlockDeviceBuilder {
+                devices: vec![block_device_config],
+            };
+            let mut vm_resources = default_vm_resources_from_block(block);
+            assert!(attach_block_devices(
+                &mut vm_resources,
+                &mut epoll_context,
+                &mut mmio_device_manager,
+            )
+            .is_ok());
+            assert!(cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
+            assert!(cmdline_contains(
+                vm_resources.cmdline(),
+                "virtio_mmio.device=4K@0xd0000000:5"
+            ));
+        }
+
+        // Multiple block devices are added.
+        {
+            let mut mmio_device_manager = default_mmio_device_manager();
+            let root = TempFile::new().unwrap();
+            let vdb = TempFile::new().unwrap();
+            let root_blk_device_config = drive::BlockDeviceConfig {
+                path_on_host: root.as_path().to_str().unwrap().to_string(),
+                is_root_device: true,
+            };
+            let secondary_blk_device_config = drive::BlockDeviceConfig {
+                path_on_host: vdb.as_path().to_str().unwrap().to_string(),
+                is_root_device: false,
+            };
+            let block = drive::BlockDeviceBuilder {
+                devices: vec![root_blk_device_config, secondary_blk_device_config],
+            };
+            let mut vm_resources = default_vm_resources_from_block(block);
+            assert!(attach_block_devices(
+                &mut vm_resources,
+                &mut epoll_context,
+                &mut mmio_device_manager,
+            )
+            .is_ok());
+            assert!(cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
+            assert!(cmdline_contains(
+                vm_resources.cmdline(),
+                "virtio_mmio.device=4K@0xd0000000:5 virtio_mmio.device=4K@0xd0001000:6"
+            ));
+        }
+    }
+
+    #[test]
+    fn test_attach_net_device() {
+        let mut vm_resources = default_vm_resources();
+        let mut epoll_context =
+            epoll::EpollContext::new(EventFd::new(libc::EFD_NONBLOCK).unwrap().as_raw_fd())
+                .unwrap();
+        let mut mmio_device_manager = MmioDeviceManager::new(
+            create_guest_memory(128, false).unwrap(),
+            0x1000,
+            arch::MMIO_MEM_START,
+            5,
+        );
+        assert!(attach_block_devices(
+            &mut vm_resources,
+            &mut epoll_context,
+            &mut mmio_device_manager,
+        )
+        .is_ok());
+    }
 }
-
-// #[cfg(test)]
-// mod tests {}

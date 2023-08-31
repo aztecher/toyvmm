@@ -49,5 +49,3 @@ pub struct Vmm {
     mmio_device_manager: device_manager::mmio::MmioDeviceManager,
     pio_device_manager: device_manager::legacy::PortIoDeviceManager,
 }
-
-impl Vmm {}

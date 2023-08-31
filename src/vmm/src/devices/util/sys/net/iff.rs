@@ -9,18 +9,34 @@ impl<T> __IncompleteArrayField<T> {
         __IncompleteArrayField(::std::marker::PhantomData)
     }
     #[inline]
+    // Manually added to suppress the "missing_safety_doc" and "useless_transmute"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::missing_safety_doc)]
+    #[allow(clippy::useless_transmute)]
     pub unsafe fn as_ptr(&self) -> *const T {
         ::std::mem::transmute(self)
     }
     #[inline]
+    // Manually added to suppress the "missing_safety_doc" and "useless_transmute"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::missing_safety_doc)]
+    #[allow(clippy::useless_transmute)]
     pub unsafe fn as_mut_ptr(&mut self) -> *mut T {
         ::std::mem::transmute(self)
     }
     #[inline]
+    // Manually added to suppress the "missing_safety_doc" and "useless_transmute"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::missing_safety_doc)]
+    #[allow(clippy::useless_transmute)]
     pub unsafe fn as_slice(&self, len: usize) -> &[T] {
         ::std::slice::from_raw_parts(self.as_ptr(), len)
     }
     #[inline]
+    // Manually added to suppress the "missing_safety_doc" and "useless_transmute"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::missing_safety_doc)]
+    #[allow(clippy::useless_transmute)]
     pub unsafe fn as_mut_slice(&mut self, len: usize) -> &mut [T] {
         ::std::slice::from_raw_parts_mut(self.as_mut_ptr(), len)
     }
@@ -45,10 +61,18 @@ impl<T> __BindgenUnionField<T> {
         __BindgenUnionField(::std::marker::PhantomData)
     }
     #[inline]
+    // Manually added to suppress the "missing_safety_doc" and "useless_transmute"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::missing_safety_doc)]
+    #[allow(clippy::useless_transmute)]
     pub unsafe fn as_ref(&self) -> &T {
         ::std::mem::transmute(self)
     }
     #[inline]
+    // Manually added to suppress the "missing_safety_doc" and "useless_transmute"
+    // warning statement in the auto-generated test code.
+    #[allow(clippy::missing_safety_doc)]
+    #[allow(clippy::useless_transmute)]
     pub unsafe fn as_mut(&mut self) -> &mut T {
         ::std::mem::transmute(self)
     }
@@ -143,7 +167,7 @@ pub const PDP_ENDIAN: ::std::os::raw::c_uint = 3412;
 pub const BYTE_ORDER: ::std::os::raw::c_uint = 1234;
 pub const _BITS_BYTESWAP_H: ::std::os::raw::c_uint = 1;
 pub const _SYS_SELECT_H: ::std::os::raw::c_uint = 1;
-pub const __FD_ZERO_STOS: &'static [u8; 6usize] = b"stosq\x00";
+pub const __FD_ZERO_STOS: &[u8; 6usize] = b"stosq\x00";
 pub const _SIGSET_H_types: ::std::os::raw::c_uint = 1;
 pub const __timespec_defined: ::std::os::raw::c_uint = 1;
 pub const _STRUCT_TIMEVAL: ::std::os::raw::c_uint = 1;
@@ -392,6 +416,9 @@ pub struct __kernel_fd_set {
     pub fds_bits: [::std::os::raw::c_ulong; 16usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___kernel_fd_set() {
     assert_eq!(
         ::std::mem::size_of::<__kernel_fd_set>(),
@@ -447,6 +474,9 @@ pub struct __kernel_fsid_t {
     pub val: [::std::os::raw::c_int; 2usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___kernel_fsid_t() {
     assert_eq!(
         ::std::mem::size_of::<__kernel_fsid_t>(),
@@ -499,6 +529,9 @@ pub struct __kernel_sockaddr_storage {
     pub __bindgen_align: [u64; 0usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___kernel_sockaddr_storage() {
     assert_eq!(
         ::std::mem::size_of::<__kernel_sockaddr_storage>(),
@@ -566,6 +599,9 @@ pub struct __fsid_t {
     pub __val: [::std::os::raw::c_int; 2usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___fsid_t() {
     assert_eq!(
         ::std::mem::size_of::<__fsid_t>(),
@@ -659,6 +695,9 @@ pub struct __sigset_t {
     pub __val: [::std::os::raw::c_ulong; 16usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___sigset_t() {
     assert_eq!(
         ::std::mem::size_of::<__sigset_t>(),
@@ -694,6 +733,9 @@ pub struct timespec {
     pub tv_nsec: __syscall_slong_t,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_timespec() {
     assert_eq!(
         ::std::mem::size_of::<timespec>(),
@@ -738,6 +780,9 @@ pub struct timeval {
     pub tv_usec: __suseconds_t,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_timeval() {
     assert_eq!(
         ::std::mem::size_of::<timeval>(),
@@ -783,6 +828,9 @@ pub struct fd_set {
     pub __fds_bits: [__fd_mask; 16usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_fd_set() {
     assert_eq!(
         ::std::mem::size_of::<fd_set>(),
@@ -855,6 +903,9 @@ pub struct pthread_attr_t {
     pub bindgen_union_field: [u64; 7usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_attr_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_attr_t>(),
@@ -899,6 +950,9 @@ pub struct __pthread_internal_list {
     pub __next: *mut __pthread_internal_list,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout___pthread_internal_list() {
     assert_eq!(
         ::std::mem::size_of::<__pthread_internal_list>(),
@@ -963,6 +1017,9 @@ pub struct pthread_mutex_t___pthread_mutex_s {
     pub __list: __pthread_list_t,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_mutex_t___pthread_mutex_s() {
     assert_eq!(
         ::std::mem::size_of::<pthread_mutex_t___pthread_mutex_s>(),
@@ -1073,6 +1130,9 @@ impl Default for pthread_mutex_t___pthread_mutex_s {
     }
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_mutex_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_mutex_t>(),
@@ -1128,6 +1188,9 @@ pub struct pthread_mutexattr_t {
     pub bindgen_union_field: u32,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_mutexattr_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_mutexattr_t>(),
@@ -1186,6 +1249,9 @@ pub struct pthread_cond_t__bindgen_ty_1 {
     pub __broadcast_seq: ::std::os::raw::c_uint,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_cond_t__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<pthread_cond_t__bindgen_ty_1>(),
@@ -1291,6 +1357,9 @@ impl Default for pthread_cond_t__bindgen_ty_1 {
     }
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_cond_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_cond_t>(),
@@ -1346,6 +1415,9 @@ pub struct pthread_condattr_t {
     pub bindgen_union_field: u32,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_condattr_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_condattr_t>(),
@@ -1410,6 +1482,9 @@ pub struct pthread_rwlock_t__bindgen_ty_1 {
     pub __flags: ::std::os::raw::c_uint,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_rwlock_t__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<pthread_rwlock_t__bindgen_ty_1>(),
@@ -1562,6 +1637,9 @@ impl Clone for pthread_rwlock_t__bindgen_ty_1 {
     }
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_rwlock_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_rwlock_t>(),
@@ -1617,6 +1695,9 @@ pub struct pthread_rwlockattr_t {
     pub bindgen_union_field: u64,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_rwlockattr_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_rwlockattr_t>(),
@@ -1663,6 +1744,9 @@ pub struct pthread_barrier_t {
     pub bindgen_union_field: [u64; 4usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_barrier_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_barrier_t>(),
@@ -1708,6 +1792,9 @@ pub struct pthread_barrierattr_t {
     pub bindgen_union_field: u32,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_pthread_barrierattr_t() {
     assert_eq!(
         ::std::mem::size_of::<pthread_barrierattr_t>(),
@@ -1752,6 +1839,9 @@ pub struct iovec {
     pub iov_len: usize,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_iovec() {
     assert_eq!(
         ::std::mem::size_of::<iovec>(),
@@ -1843,6 +1933,9 @@ pub struct sockaddr {
     pub sa_data: [::std::os::raw::c_char; 14usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_sockaddr() {
     assert_eq!(
         ::std::mem::size_of::<sockaddr>(),
@@ -1887,6 +1980,9 @@ pub struct sockaddr_storage {
     pub __ss_align: ::std::os::raw::c_ulong,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_sockaddr_storage() {
     assert_eq!(
         ::std::mem::size_of::<sockaddr_storage>(),
@@ -1966,6 +2062,9 @@ pub struct msghdr {
     pub msg_flags: ::std::os::raw::c_int,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_msghdr() {
     assert_eq!(
         ::std::mem::size_of::<msghdr>(),
@@ -2096,6 +2195,9 @@ pub struct linger {
     pub l_linger: ::std::os::raw::c_int,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_linger() {
     assert_eq!(
         ::std::mem::size_of::<linger>(),
@@ -2140,6 +2242,9 @@ pub struct osockaddr {
     pub sa_data: [::std::os::raw::c_uchar; 14usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_osockaddr() {
     assert_eq!(
         ::std::mem::size_of::<osockaddr>(),
@@ -2326,6 +2431,9 @@ pub struct sync_serial_settings {
     pub loopback: ::std::os::raw::c_ushort,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_sync_serial_settings() {
     assert_eq!(
         ::std::mem::size_of::<sync_serial_settings>(),
@@ -2382,6 +2490,9 @@ pub struct te1_settings {
     pub slot_map: ::std::os::raw::c_uint,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_te1_settings() {
     assert_eq!(
         ::std::mem::size_of::<te1_settings>(),
@@ -2446,6 +2557,9 @@ pub struct raw_hdlc_proto {
     pub parity: ::std::os::raw::c_ushort,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_raw_hdlc_proto() {
     assert_eq!(
         ::std::mem::size_of::<raw_hdlc_proto>(),
@@ -2495,6 +2609,9 @@ pub struct fr_proto {
     pub dce: ::std::os::raw::c_ushort,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_fr_proto() {
     assert_eq!(
         ::std::mem::size_of::<fr_proto>(),
@@ -2588,6 +2705,9 @@ pub struct fr_proto_pvc {
     pub dlci: ::std::os::raw::c_uint,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_fr_proto_pvc() {
     assert_eq!(
         ::std::mem::size_of::<fr_proto_pvc>(),
@@ -2622,6 +2742,9 @@ pub struct fr_proto_pvc_info {
     pub master: [::std::os::raw::c_char; 16usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_fr_proto_pvc_info() {
     assert_eq!(
         ::std::mem::size_of::<fr_proto_pvc_info>(),
@@ -2666,6 +2789,9 @@ pub struct cisco_proto {
     pub timeout: ::std::os::raw::c_uint,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_cisco_proto() {
     assert_eq!(
         ::std::mem::size_of::<cisco_proto>(),
@@ -2742,19 +2868,19 @@ pub const net_device_flags_IFF_DYNAMIC: net_device_flags = 32768;
  * @IFF_LOOPBACK: is a loopback net. Volatile.
  * @IFF_POINTOPOINT: interface is has p-p link. Volatile.
  * @IFF_NOTRAILERS: avoid use of trailers. Can be toggled through sysfs.
- *	Volatile.
+ *  Volatile.
  * @IFF_RUNNING: interface RFC2863 OPER_UP. Volatile.
  * @IFF_NOARP: no ARP protocol. Can be toggled through sysfs. Volatile.
  * @IFF_PROMISC: receive all packets. Can be toggled through sysfs.
  * @IFF_ALLMULTI: receive all multicast packets. Can be toggled through
- *	sysfs.
+ *  sysfs.
  * @IFF_MASTER: master of a load balancer. Volatile.
  * @IFF_SLAVE: slave of a load balancer. Volatile.
  * @IFF_MULTICAST: Supports multicast. Can be toggled through sysfs.
  * @IFF_PORTSEL: can set media type. Can be toggled through sysfs.
  * @IFF_AUTOMEDIA: auto media select active. Can be toggled through sysfs.
  * @IFF_DYNAMIC: dialup device with changing addresses. Can be toggled
- *	through sysfs.
+ *  through sysfs.
  * @IFF_LOWER_UP: driver signals L1 up. Volatile.
  * @IFF_DORMANT: driver signals dormant. Volatile.
  * @IFF_ECHO: echo sent packets. Volatile.
@@ -2782,6 +2908,9 @@ pub struct ifmap {
     pub port: ::std::os::raw::c_uchar,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ifmap() {
     assert_eq!(
         ::std::mem::size_of::<ifmap>(),
@@ -2879,6 +3008,9 @@ pub struct if_settings__bindgen_ty_1 {
     pub bindgen_union_field: u64,
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_if_settings__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<if_settings__bindgen_ty_1>(),
@@ -2967,6 +3099,9 @@ impl Clone for if_settings__bindgen_ty_1 {
     }
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_if_settings() {
     assert_eq!(
         ::std::mem::size_of::<if_settings>(),
@@ -3027,6 +3162,9 @@ pub struct ifreq__bindgen_ty_1 {
     pub bindgen_union_field: [u8; 16usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ifreq__bindgen_ty_1() {
     assert_eq!(
         ::std::mem::size_of::<ifreq__bindgen_ty_1>(),
@@ -3073,6 +3211,9 @@ pub struct ifreq__bindgen_ty_2 {
     pub bindgen_union_field: [u64; 3usize],
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ifreq__bindgen_ty_2() {
     assert_eq!(
         ::std::mem::size_of::<ifreq__bindgen_ty_2>(),
@@ -3221,6 +3362,9 @@ impl Clone for ifreq__bindgen_ty_2 {
     }
 }
 #[test]
+// Manually added to suppress the "dereference a null pointer" warning statement in the auto-generated test code.
+#[allow(deref_nullptr)]
+#[allow(clippy::zero_ptr)]
 fn bindgen_test_layout_ifreq() {
     assert_eq!(
         ::std::mem::size_of::<ifreq>(),

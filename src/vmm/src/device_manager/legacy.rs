@@ -108,3 +108,23 @@ impl PortIoDeviceManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        builder::{setup_interrupt_controller, setup_stdio_serial_device},
+        vstate::{memory, vm::Vm},
+    };
+    use vm_memory::GuestAddress;
+
+    #[test]
+    fn test_register_legacy_devices() {
+        let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 128 << 20)], false).unwrap();
+        let mut vm = Vm::new().unwrap();
+        vm.memory_init(&gm, false).unwrap();
+        setup_interrupt_controller(&mut vm).unwrap();
+        let mut dm = PortIoDeviceManager::new(setup_stdio_serial_device()).unwrap();
+        assert!(dm.register_devices(vm.fd()).is_ok());
+    }
+}

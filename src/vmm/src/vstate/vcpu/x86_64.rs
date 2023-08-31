@@ -68,3 +68,38 @@ impl KvmVcpu {
         Ok(())
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::vstate::memory;
+
+    #[test]
+    fn test_kvm_vcpu_configure() {
+        {
+            let mut vm = Vm::new().unwrap();
+            let gm =
+                memory::create_guest_memory(&[(None, GuestAddress(0), 0x1000)], false).unwrap();
+            vm.memory_init(&gm, false).unwrap();
+            vm.setup_irqchip().unwrap();
+            let mut kvm_vcpu = KvmVcpu::new(0, &vm).unwrap();
+            let mut kvm_cpuid = vm.supported_cpuid().clone();
+            assert!(kvm_vcpu
+                .configure(&gm, GuestAddress(0), 0, 1, &mut kvm_cpuid)
+                .is_err());
+        }
+
+        {
+            let mut vm = Vm::new().unwrap();
+            let gm =
+                memory::create_guest_memory(&[(None, GuestAddress(0), 128 << 20)], false).unwrap();
+            vm.memory_init(&gm, false).unwrap();
+            vm.setup_irqchip().unwrap();
+            let mut kvm_vcpu = KvmVcpu::new(0, &vm).unwrap();
+            let mut kvm_cpuid = vm.supported_cpuid().clone();
+            assert!(kvm_vcpu
+                .configure(&gm, GuestAddress(0), 0, 1, &mut kvm_cpuid)
+                .is_ok());
+        }
+    }
+}
