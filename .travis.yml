@@ -1,4 +1,4 @@
-dist: focal
+dist: jammy
 sudo: true
 addons:
   apt:
@@ -6,6 +6,7 @@ addons:
       - qemu-kvm
 language: rust
 rust:
-  - 1.57.0
+  - 1.72.0
 script:
-  - sudo -E env "PATH=$PATH" cargo test -- --nocapture
+  - make test
+  - make build
