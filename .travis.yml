@@ -1,4 +1,4 @@
-dist: focal
+dist: jammy
 sudo: true
 addons:
   apt:
@@ -6,6 +6,13 @@ addons:
       - qemu-kvm
 language: rust
 rust:
-  - 1.57.0
+  - 1.72.0
+before_script:
+  - rustup component add rustfmt
+  - rustup component add clippy
 script:
-  - sudo -E env "PATH=$PATH" cargo test -- --nocapture
+  - sudo -E env "PATH=${PATH}" cargo test -p vmm
+  - sudo -E env "PATH=${PATH}" cargo test -p toyvmm
+  - sudo rm -rf target
+  - make build
+  - sudo rm -rf /home/travis/.cargo

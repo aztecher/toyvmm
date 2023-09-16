@@ -49,12 +49,12 @@ function test_priv() {
 	if [ -z $priv_tests_toyvmm_module ]; then
 		echo "The test that needs to be privileged is not in the toyvmm module."
 	else
-		sudo -E cargo test -p toyvmm $priv_tests_toyvmm_module
+		sudo -E env "PATH=${PATH}" cargo test -p toyvmm $priv_tests_toyvmm_module
 	fi
 	if [ -z $priv_tests_vmm_module ]; then
 		echo "The test that needs to be privileged is not in the vmm module."
 	else
-		sudo -E cargo test -p vmm $priv_tests_vmm_module
+		sudo -E env "PATH=${PATH}" cargo test -p vmm $priv_tests_vmm_module
 	fi
 }
 
