@@ -118,15 +118,10 @@ impl EpollContext {
         let ref mut maybe = self.device_handlers[device_idx];
         match maybe.handler {
             Some(ref mut v) => v.as_mut(),
-            None => {
-                // This should only be called in response to an epoll trigger, and the channel
-                // should always contain a message after the events were added to epoll
-                // by the activate() call
-                maybe
-                    .handler
-                    .get_or_insert(maybe.receiver.try_recv().unwrap())
-                    .as_mut()
-            }
+            None => maybe
+                .handler
+                .get_or_insert(maybe.receiver.recv().unwrap())
+                .as_mut(),
         }
     }
 }

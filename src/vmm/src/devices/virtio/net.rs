@@ -147,7 +147,9 @@ impl NetEpollHandler {
                 Ok(count) => {
                     self.rx_count = count;
                     if !self.rx_single_frame() {
-                        println!("differed_rx turn to true");
+                        // DEBUG)  Found that when the Hypervisor OS is Ubuntu 22.04,
+                        //         this process is performed at boot
+                        // println!("differed_rx turn to true");
                         self.deferred_rx = true;
                         break;
                     }

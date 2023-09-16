@@ -3,7 +3,7 @@
 ## Architecture & OS
 
 ToyVMM only supports **x86_64** Linux for Guest OS.  
-ToyVMM has been confirmed to work with Rocky Linux 8.6, 9.1 and Ubuntu 18.04 as the Hypervisor OS.  
+ToyVMM has been confirmed to work with Rocky Linux 8.6, 9.1 and Ubuntu 18.04, 22.04 as the Hypervisor OS.  
 
 ## Prerequisites
 
