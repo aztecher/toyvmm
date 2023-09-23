@@ -49,6 +49,13 @@ impl<'a> DescriptorChain<'a> {
             return None;
         }
 
+        // The size of each element of descriptor table is 16 bytes
+        // - le64 addr  = 8byte
+        // - le32 len   = 4byte
+        // - le16 flags = 2byte
+        // - le16 next  = 2byte
+        // So, the calculation of the offset of the address
+        // indicated by desc_index is 'index * 16'
         let desc_head = match mem.checked_offset(desc_table, (index as usize) * 16) {
             Some(a) => a,
             None => return None,
@@ -134,12 +141,18 @@ impl<'a, 'b> Iterator for AvailIter<'a, 'b> {
             return None;
         }
 
+        // Access the avail_ring element indicated by self.next_index
+        // skip 4byte (=u16 x 2 / 'flags' member and 'idx' member from avail_ring)
+        // Because of the Ring, calculate modulo (= self.next_index % self.queue_size)
+        // and the result of modulo calculation, convert to 2bytes order
+        // (because the unit of avail_ring's element is 2byte)
         let offset = (4 + (self.next_index.0 % self.queue_size) * 2) as usize;
+        // Calculate the next desc_index address from avail_ring address.
         let avail_addr = match self.mem.checked_offset(self.avail_ring, offset) {
             Some(a) => a,
             None => return None,
         };
-        // This index is checked below in checked_new
+        // Get the next desc_index value from avail_ring.
         let desc_index: u16 = self.mem.read_obj(avail_addr).unwrap();
 
         self.next_index += Wrapping(1);
@@ -290,14 +303,16 @@ impl Queue {
         }
         let used_ring = self.used_ring;
         let next_used = (self.next_used.0 % self.actual_size()) as u64;
+
+        // virtq_used structure has 4 byte entry before `ring` fields, so skip 4 byte.
+        // And each ring entry has 8 bytes, so skip 8 * index.
         let used_elem = used_ring.unchecked_add(4 + next_used * 8);
-
-        // There writes can't fail as we are guaranteed to be within the descriptor ring.
-
-        // TODO: This code is valid??? and need to understand this semantics
+        // write the descriptor index to virtq_used_elem.id
         mem.write_obj(desc_index, used_elem).unwrap();
+        // write the data length to the virtq_used_elem.len
         mem.write_obj(len, used_elem.unchecked_add(4)).unwrap();
 
+        // increment the used index that is the last processed in host side.
         self.next_used += Wrapping(1);
 
         // This fence ensures all descriptor writes are visible before the index update is.
