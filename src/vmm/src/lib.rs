@@ -1,5 +1,7 @@
 pub mod arch;
+pub mod arch_gen;
 pub mod builder;
+pub mod cpu;
 pub mod device_manager;
 pub mod devices;
 pub mod resources;

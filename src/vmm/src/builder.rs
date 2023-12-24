@@ -1,5 +1,5 @@
 use crate::{
-    arch,
+    arch, cpu,
     device_manager::{
         legacy::PortIoDeviceManager,
         mmio::{MmioDeviceError, MmioDeviceManager},
@@ -16,7 +16,11 @@ use crate::{
         },
     },
     resources,
-    vstate::{memory, vcpu::Vcpu, vm::Vm},
+    vstate::{
+        memory,
+        vcpu::{Vcpu, VcpuError},
+        vm::Vm,
+    },
     Vmm, VmmError,
 };
 use ::epoll as ep;
@@ -64,6 +68,9 @@ pub enum StartVmError {
     #[error(
         "Cannot load kernel due to invalid memory configuration or invalid kernel image: {}", .0)]
     KernelLoader(linux_loader::loader::Error),
+    /// Cannot configure system for boot.
+    #[error("System configuration error: {0}")]
+    ConfigureSystem(arch::x86_64::ArchError),
     /// Cannot open the block device backing file.
     #[error("Cannot open the block device backing file: {0}")]
     OpenBlockDevice(std::io::Error),
@@ -153,7 +160,8 @@ where
         .seek(SeekFrom::Start(0))
         .map_err(StartVmError::InitrdRead)?;
     // Get the target address
-    let address = arch::initrd_load_addr(vm_memory, size).map_err(|_| StartVmError::InitrdLoad)?;
+    let address =
+        arch::x86_64::initrd_load_addr(vm_memory, size).map_err(|_| StartVmError::InitrdLoad)?;
 
     // Load the image into memory
     //   - read_from is defined as trait methods of Bytes<A>
@@ -174,7 +182,7 @@ fn create_guest_memory(
     track_dirty_pages: bool,
 ) -> std::result::Result<memory::GuestMemoryMmap, StartVmError> {
     let mem_size = mem_size_mib << 20;
-    let arch_mem_regions = arch::arch_memory_regions(mem_size);
+    let arch_mem_regions = arch::x86_64::arch_memory_regions(mem_size);
 
     memory::create_guest_memory(
         &arch_mem_regions
@@ -186,19 +194,22 @@ fn create_guest_memory(
     .map_err(StartVmError::GuestMemoryMmap)
 }
 
-fn create_vcpus(vm: &Vm, _vcpu_count: u8, exit_evt: &EventFd) -> Result<Vcpu, VmmError> {
-    // TODO: Now only support single vCPU, but will be support multi vCPU.
-    let cpu_idx = 0;
-    let exit_evt = exit_evt.try_clone().map_err(VmmError::EventFd)?;
-    let vcpu = Vcpu::new(cpu_idx, vm, exit_evt).map_err(VmmError::VcpuCreate)?;
-    Ok(vcpu)
+fn create_vcpus(vm: &Vm, vcpu_count: u8, exit_evt: &EventFd) -> Result<Vec<Vcpu>, VmmError> {
+    let mut vcpus = Vec::new();
+    for cpu_idx in 0..vcpu_count {
+        let exit_evt = exit_evt.try_clone().map_err(VmmError::EventFd)?;
+        let vcpu = Vcpu::new(cpu_idx, vm, exit_evt).map_err(VmmError::VcpuCreate)?;
+        vcpus.push(vcpu);
+    }
+    Ok(vcpus)
 }
 
 fn create_vmm_and_vcpus(
     guest_memory: memory::GuestMemoryMmap,
     track_dirty_pages: bool,
     vcpu_count: u8,
-) -> Result<(Vmm, Vcpu), StartVmError> {
+    vcpu_exit_evt: &EventFd,
+) -> Result<(Vmm, Vec<Vcpu>), StartVmError> {
     let mut vm = Vm::new()
         .map_err(VmmError::Vm)
         .map_err(StartVmError::Internal)?;
@@ -207,14 +218,15 @@ fn create_vmm_and_vcpus(
         .map_err(StartVmError::Internal)?;
     setup_interrupt_controller(&mut vm)?;
 
-    let vcpu_exit_evt = EventFd::new(libc::EFD_NONBLOCK)
-        .map_err(VmmError::EventFd)
-        .map_err(StartVmError::Internal)?;
-    let vcpu = create_vcpus(&vm, vcpu_count, &vcpu_exit_evt).map_err(StartVmError::Internal)?;
+    let vcpu = create_vcpus(&vm, vcpu_count, vcpu_exit_evt).map_err(StartVmError::Internal)?;
 
     // MMIO Device Manager
-    let mmio_device_manager =
-        MmioDeviceManager::new(guest_memory.clone(), 0x1000, arch::MMIO_MEM_START, 5);
+    let mmio_device_manager = MmioDeviceManager::new(
+        guest_memory.clone(),
+        0x1000,
+        arch::x86_64::MMIO_MEM_START,
+        5,
+    );
 
     // Legacy Device Manager
     let mut pio_device_manager = PortIoDeviceManager::new(setup_stdio_serial_device())
@@ -284,12 +296,20 @@ fn attach_net_devices(
 
 fn configure_system_for_boot(
     vmm: &Vmm,
-    vcpu: &mut Vcpu,
+    vcpus: &mut [Vcpu],
     vm_resources: &resources::VmResources,
     entry_addr: GuestAddress,
     initrd: &Option<InitrdConfig>,
-    // boot_cmdline: &Cmdline,
 ) -> Result<(), StartVmError> {
+    let mut cpuid = cpu::Cpuid::try_from(vmm.vm.supported_cpuid().clone()).unwrap();
+
+    let num_cpus = vcpus.len() as u8;
+    for vcpu in vcpus.iter_mut() {
+        vcpu.configure(&vmm.guest_memory, entry_addr, &mut cpuid, num_cpus)
+            .map_err(VmmError::VcpuConfigure)
+            .map_err(StartVmError::Internal)?;
+    }
+
     let boot_cmdline = vm_resources.cmdline();
     // Load cmdline
     load_cmdline::<memory::GuestMemoryMmap>(
@@ -301,94 +321,92 @@ fn configure_system_for_boot(
 
     let cmdline_cstr = boot_cmdline.as_cstring().unwrap();
     let cmdline_size = cmdline_cstr.to_str().unwrap().len() + 1;
-    let num_cpus = 1;
     arch::x86_64::configure_system(
         &vmm.guest_memory,
         GuestAddress(arch::x86_64::CMDLINE_START),
         cmdline_size,
         initrd,
-        num_cpus,
+        num_cpus as u8,
     )
-    .unwrap();
-
-    let cpu_id = 0;
-    let num_cpus = 1;
-    let mut kvm_cpuid = vmm.vm.supported_cpuid().clone();
-    vcpu.configure(
-        &vmm.guest_memory,
-        entry_addr,
-        cpu_id as u64,
-        num_cpus as u64,
-        &mut kvm_cpuid,
-    )
-    .map_err(VmmError::VcpuConfigure)
-    .map_err(StartVmError::Internal)?;
+    .map_err(StartVmError::ConfigureSystem)?;
     Ok(())
 }
 
 fn run_vcpus(
-    vcpu: Vcpu,
+    vcpus: &mut Vec<Vcpu>,
     vmm: &Vmm,
     vcpu_handles: &mut Vec<std::thread::JoinHandle<()>>,
     vcpu_thread_barrier: &mut Arc<Barrier>,
 ) -> Result<(), StartVmError> {
-    let pio_bus = vmm.pio_device_manager.io_bus.clone();
-    let mmio_bus = vmm.mmio_device_manager.bus.clone();
-
     let kill_signaled = Arc::new(AtomicBool::new(false));
-    let barrier = vcpu_thread_barrier.clone();
-    let vcpu_exit_evt = vcpu
-        .exit_evt
-        .try_clone()
-        .map_err(VmmError::EventFd)
-        .map_err(StartVmError::Internal)?;
-    vcpu_handles.push(
-        std::thread::Builder::new()
-            .name(String::from("vcpu_0"))
-            .spawn(move || {
-                barrier.wait();
-                loop {
-                    match vcpu.run() {
-                        Ok(run) => match run {
-                            VcpuExit::IoIn(addr, data) => {
-                                pio_bus.read(addr as u64, data);
-                            }
-                            VcpuExit::IoOut(addr, data) => {
-                                pio_bus.write(addr as u64, data);
-                            }
-                            VcpuExit::MmioRead(addr, data) => {
-                                mmio_bus.read(addr, data);
-                            }
-                            VcpuExit::MmioWrite(addr, data) => {
-                                mmio_bus.write(addr, data);
-                            }
-                            VcpuExit::Hlt => {
-                                break;
-                            }
-                            VcpuExit::Shutdown => {
-                                break;
-                            }
-                            _ => {
-                                println!("unexpected exit reason");
-                                break;
-                            }
-                        },
-                        Err(e) => {
-                            println!("vcpu hit unknown error: {:?}", e);
+
+    for (vcpu_id, vcpu) in vcpus.drain(..).enumerate() {
+        let pio_bus = vmm.pio_device_manager.io_bus.clone();
+        let mmio_bus = vmm.mmio_device_manager.bus.clone();
+        let kill_signaled = kill_signaled.clone();
+        let vcpu_thread_barrier = vcpu_thread_barrier.clone();
+        let vcpu_exit_evt = vcpu
+            .exit_evt
+            .try_clone()
+            .map_err(VmmError::EventFd)
+            .map_err(StartVmError::Internal)?;
+        vcpu_handles.push(
+            std::thread::Builder::new()
+                .name(format!("toyvmm_vcpu{}", vcpu_id))
+                .spawn(move || {
+                    vcpu_thread_barrier.wait();
+                    loop {
+                        match vcpu.run() {
+                            Ok(run) => match run {
+                                VcpuExit::IoIn(addr, data) => {
+                                    pio_bus.read(addr as u64, data);
+                                }
+                                VcpuExit::IoOut(addr, data) => {
+                                    pio_bus.write(addr as u64, data);
+                                }
+                                VcpuExit::MmioRead(addr, data) => {
+                                    mmio_bus.read(addr, data);
+                                }
+                                VcpuExit::MmioWrite(addr, data) => {
+                                    mmio_bus.write(addr, data);
+                                }
+                                VcpuExit::Hlt => {
+                                    break;
+                                }
+                                VcpuExit::Shutdown => {
+                                    break;
+                                }
+                                _ => {
+                                    println!("unexpected exit reason");
+                                    break;
+                                }
+                            },
+                            Err(e) => match e {
+                                VcpuError::VcpuRun(err) => {
+                                    if err.errno() == libc::EAGAIN {
+                                        // Skip EAGAIN
+                                        continue;
+                                    }
+                                    println!("vcpu run unhandled errno: {:?}", err);
+                                    break;
+                                }
+                                _ => {
+                                    println!("vcpu hit unknown error: {:?}", e);
+                                    break;
+                                }
+                            },
+                        }
+                        if kill_signaled.load(Ordering::SeqCst) {
                             break;
                         }
                     }
-                    if kill_signaled.load(Ordering::SeqCst) {
-                        break;
-                    }
-                }
-                vcpu_exit_evt
-                    .write(1)
-                    .expect("failed to signal vcpu exit eventfd");
-            })
-            .unwrap(),
-    );
-    // run vcpu threads!
+                    vcpu_exit_evt
+                        .write(1)
+                        .expect("failed to signal vcpu exit eventfd");
+                })
+                .unwrap(),
+        );
+    }
     vcpu_thread_barrier.wait();
     Ok(())
 }
@@ -490,14 +508,19 @@ pub fn build_and_boot_vm(mut vm_resources: resources::VmResources) -> Result<(),
     )?;
     let entry_addr = load_kernel(&mut vm_resources, &guest_memory)?;
     let initrd = load_initrd_from_resource(&mut vm_resources, &guest_memory)?;
-    let (mut vmm, mut vcpu) = create_vmm_and_vcpus(
+
+    let vcpu_exit_evt = EventFd::new(libc::EFD_NONBLOCK)
+        .map_err(VmmError::EventFd)
+        .map_err(StartVmError::Internal)?;
+    let (mut vmm, mut vcpus) = create_vmm_and_vcpus(
         guest_memory,
         vm_resources.vm_config.track_dirty_page,
         vm_resources.vm_config.vcpu_count,
+        &vcpu_exit_evt,
     )?;
 
     let mut epoll_context =
-        epoll::EpollContext::new(vcpu.exit_evt.as_raw_fd()).map_err(EpollCtx)?;
+        epoll::EpollContext::new(vcpu_exit_evt.as_raw_fd()).map_err(EpollCtx)?;
     attach_block_devices(
         &mut vm_resources,
         &mut epoll_context,
@@ -513,20 +536,18 @@ pub fn build_and_boot_vm(mut vm_resources: resources::VmResources) -> Result<(),
         .map_err(VmmError::MmioNotifier)
         .map_err(StartVmError::Internal)?;
 
-    configure_system_for_boot(
-        &vmm,
-        &mut vcpu,
-        &vm_resources,
-        entry_addr,
-        &initrd,
-        // &mut vm_resources.cmdline_mut(),
-    )?;
+    configure_system_for_boot(&vmm, &mut vcpus, &vm_resources, entry_addr, &initrd)?;
 
     // Run vCpu / Stdio Thread
-    let num_cpus = 1;
-    let mut vcpu_handles = Vec::with_capacity(num_cpus);
-    let mut vcpu_thread_barrier = Arc::new(Barrier::new(num_cpus + 1));
-    run_vcpus(vcpu, &vmm, &mut vcpu_handles, &mut vcpu_thread_barrier)?;
+    let vcpu_count = vcpus.len();
+    let mut vcpu_handles = Vec::with_capacity(vcpu_count);
+    let mut vcpu_thread_barrier = Arc::new(Barrier::new(vcpu_count + 1));
+    run_vcpus(
+        &mut vcpus,
+        &vmm,
+        &mut vcpu_handles,
+        &mut vcpu_thread_barrier,
+    )?;
     run_epoll_thread(&vmm.pio_device_manager, &mut epoll_context)?;
 
     // wait for stopping all threads
@@ -566,7 +587,7 @@ pub(crate) mod tests {
     fn default_kernel_cmdline() -> linux_loader::cmdline::Cmdline {
         linux_loader::cmdline::Cmdline::try_from(
             boot_source::DEFAULT_KERNEL_CMDLINE,
-            arch::CMDLINE_MAX_SIZE,
+            arch::x86_64::CMDLINE_MAX_SIZE,
         )
         .unwrap()
     }
@@ -617,7 +638,7 @@ pub(crate) mod tests {
         MmioDeviceManager::new(
             create_guest_memory(128, false).unwrap(),
             0x1000,
-            arch::MMIO_MEM_START,
+            arch::x86_64::MMIO_MEM_START,
             5,
         )
     }
@@ -634,7 +655,7 @@ pub(crate) mod tests {
     #[test]
     fn test_load_initrd() {
         let image = make_test_bin();
-        let mem_size = image.len() * 2 + arch::PAGE_SIZE;
+        let mem_size = image.len() * 2 + arch::x86_64::PAGE_SIZE;
         let tempfile = TempFile::new().unwrap();
         let mut tempfile = tempfile.into_file();
         tempfile.write_all(&image).unwrap();
@@ -768,7 +789,7 @@ pub(crate) mod tests {
         let mut mmio_device_manager = MmioDeviceManager::new(
             create_guest_memory(128, false).unwrap(),
             0x1000,
-            arch::MMIO_MEM_START,
+            arch::x86_64::MMIO_MEM_START,
             5,
         );
         assert!(attach_block_devices(

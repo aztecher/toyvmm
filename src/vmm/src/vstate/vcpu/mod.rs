@@ -1,11 +1,11 @@
 pub mod x86_64;
 
 use crate::{
-    arch,
+    arch, cpu,
     utils::memory,
     vstate::{memory::GuestMemoryMmap, vcpu::x86_64::KvmVcpuConfigureError, vm::Vm},
 };
-use kvm_bindings::{kvm_regs, kvm_sregs, CpuId};
+use kvm_bindings::{kvm_regs, kvm_sregs};
 use kvm_ioctls::{Kvm, VcpuExit, VcpuFd};
 use std::os::unix::io::AsRawFd;
 use utils::eventfd::EventFd;
@@ -43,7 +43,7 @@ pub enum VcpuError {
     // MsrsConfiguration(arch::x86_64::MsrError),
     /// Vcpu registers configuration error.
     #[error("Vcpu registers configuration error: {0}")]
-    RegsConfiguration(arch::x86_64::RegError),
+    RegsConfiguration(arch::x86_64::regs::RegError),
     // InterruptConfiguration(arch::x86_64::InterruptError),
     /// KvmVcpu configuration error.
     #[error("Kvm vcpu configuration error: {0}")]
@@ -81,22 +81,12 @@ impl Vcpu {
         &mut self,
         guest_memory: &GuestMemoryMmap,
         kernel_start_addr: GuestAddress,
-        id: u64,
-        num_cpus: u64,
-        cpuid: &mut CpuId,
+        cpuid: &mut cpu::Cpuid,
+        num_cpus: u8,
     ) -> Result<(), VcpuError> {
         self.kvm_vcpu
-            .configure(guest_memory, kernel_start_addr, id, num_cpus, cpuid)
+            .configure(guest_memory, kernel_start_addr, cpuid, num_cpus)
             .map_err(VcpuError::KvmVcpuConfiguration)?;
-
-        // arch::x86_64::setup_cpuid(self.fd(), id, num_cpus, cpuid);
-        //
-        // // arch::x86_64::setup_msrs(&self.fd()).map_err(Error::MsrsConfiguration)?;
-        // arch::x86_64::setup_regs(self.fd(), kernel_start_addr.raw_value() as u64)
-        //     .map_err(VcpuError::RegsConfiguration)?;
-        // // arch::x86_64::setup_fpu(&self.fd()).map_err(Error::RegsConfiguration)?;
-        // arch::x86_64::setup_sregs(self.fd(), guest_mem).map_err(VcpuError::RegsConfiguration)?;
-        // // arch::x86_64::set_lint(&self.fd()).map_err(Error::InterruptConfiguration)?;
         Ok(())
     }
 
@@ -164,10 +154,9 @@ pub(crate) mod tests {
             vm.memory_init(&gm, false).unwrap();
             vm.setup_irqchip().unwrap();
             let mut vcpu = Vcpu::new(0, &vm, EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap();
-            let mut kvm_cpuid = vm.supported_cpuid().clone();
-            assert!(vcpu
-                .configure(&gm, GuestAddress(0), 0, 1, &mut kvm_cpuid)
-                .is_err());
+            let kvm_cpuid = vm.supported_cpuid().clone();
+            let mut cpuid = cpu::Cpuid::try_from(kvm_cpuid).unwrap();
+            assert!(vcpu.configure(&gm, GuestAddress(0), &mut cpuid, 1).is_err());
         }
 
         {
@@ -177,10 +166,9 @@ pub(crate) mod tests {
             vm.memory_init(&gm, false).unwrap();
             vm.setup_irqchip().unwrap();
             let mut vcpu = Vcpu::new(0, &vm, EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap();
-            let mut kvm_cpuid = vm.supported_cpuid().clone();
-            assert!(vcpu
-                .configure(&gm, GuestAddress(0), 0, 1, &mut kvm_cpuid)
-                .is_ok());
+            let kvm_cpuid = vm.supported_cpuid().clone();
+            let mut cpuid = cpu::Cpuid::try_from(kvm_cpuid).unwrap();
+            assert!(vcpu.configure(&gm, GuestAddress(0), &mut cpuid, 1).is_ok());
         }
     }
 }
