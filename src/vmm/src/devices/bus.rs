@@ -49,7 +49,8 @@ impl Ord for BusRange {
 
 impl PartialOrd for BusRange {
     fn partial_cmp(&self, other: &BusRange) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
+        // self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 

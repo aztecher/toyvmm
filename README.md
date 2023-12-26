@@ -1,6 +1,17 @@
 # ToyVMM (Toy Virtual Machine Monitor)
 
-[![Build Status](https://app.travis-ci.com/aztecher/toyvmm.svg?branch=main)](https://app.travis-ci.com/aztecher/toyvmm)
+<p>
+  <a alia-label="Build" href="https://app.travis-ci.com/aztecher/toyvmm">
+    <img alt="" src="https://img.shields.io/travis/com/aztecher/toyvmm.svg?style=for-the-badge&logo=travisci">
+  </a>
+  <!-- <a alia-label="License" href=""> -->
+  <!--   <img alt="" src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge"> -->
+  <!-- </a> -->
+  <a alia-label="Book" href="https://aztecher.github.io/en/">
+    <img alt="" src="https://img.shields.io/badge/read%20the-book-9cf.svg?style=for-the-badge&logo=mdbook">
+  </a>
+</p>
+
 
 ## Overview
 
