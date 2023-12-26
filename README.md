@@ -31,6 +31,7 @@ If you find any mistakes or my misunderstandings in the documentation, please fe
 
 **CHANGE LOG**
 
+* Dec 27, 2023 : Add contents about SMP only in ja.
 * Sep 24, 2023 : Add 'Virtio' contents and translate all existing contents into ja / en.
 * Jan  5, 2023 : Add contents (Load Linux Kernel, and its subcontents)
 * Apr  7, 2022 : First publish (Introduction, QuickStart, Running Tiny Code in VM)
