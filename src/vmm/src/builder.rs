@@ -23,10 +23,10 @@ use crate::{
     },
     Vmm, VmmError,
 };
-use ::epoll as ep;
 use kvm_ioctls::VcpuExit;
 use linux_loader::loader::{elf::Elf as Loader, load_cmdline, KernelLoader};
 use std::fs::File;
+use utils::epoll::{ControlOperation, EpollEvent};
 
 use std::{
     io::{self, Read, Seek, SeekFrom},
@@ -450,14 +450,10 @@ fn run_epoll_thread(
     }};
 
     const EPOLL_EVENT_LEN: usize = 100;
-    let mut events = Vec::<ep::Event>::with_capacity(EPOLL_EVENT_LEN);
-    // Safe as we pass to set_len the value passed to with_capacity
-    unsafe { events.set_len(EPOLL_EVENT_LEN) };
-    let epoll_raw_fd = epoll_ctx.epoll_raw_fd;
+    let mut events = vec![EpollEvent::default(); EPOLL_EVENT_LEN];
     'poll: loop {
-        let num_events = ep::wait(epoll_raw_fd, -1, &mut events[..]).unwrap();
+        let num_events = epoll_ctx.ep.wait(-1, &mut events[..]).unwrap();
         for i in 0..num_events {
-            // for event in events.iter() {
             let dispatch_idx = events[i].data() as usize;
             let dispatch_type = epoll_ctx.dispatch_table[dispatch_idx];
             match dispatch_type {
@@ -466,14 +462,10 @@ fn run_epoll_thread(
                     let mut out = [0u8; 64];
                     match stdin_lock.read_raw(&mut out[..]) {
                         Ok(0) => {
-                            // Zero-length read indicates EOF. Remove from pollable
-                            ep::ctl(
-                                epoll_raw_fd,
-                                ep::EPOLL_CTL_DEL,
-                                libc::STDIN_FILENO,
-                                events[i],
-                            )
-                            .unwrap();
+                            epoll_ctx
+                                .ep
+                                .ctl(ControlOperation::Delete, libc::STDIN_FILENO, events[i])
+                                .unwrap();
                         }
                         Ok(count) => {
                             pio_device_manager
@@ -491,7 +483,7 @@ fn run_epoll_thread(
                 }
                 epoll::EpollDispatch::DeviceHandler(device_idx, device_token) => {
                     let handler = epoll_ctx.get_device_handler(device_idx);
-                    handler.handle_event(device_token, events[i].events().bits());
+                    handler.handle_event(device_token, events[i].events());
                 }
             }
         }

@@ -18,9 +18,9 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
     os::linux::fs::MetadataExt,
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::AsRawFd,
 };
-use utils::eventfd::EventFd;
+use utils::{epoll, eventfd::EventFd};
 use vm_memory::{Bytes, GuestAddress, GuestMemory, GuestMemoryError};
 
 const SECTOR_SHIFT: u8 = 9; // 512 = 2^9
@@ -325,20 +325,20 @@ impl EpollHandler for BlockEpollHandler {
 pub struct EpollConfig {
     queue_avail_token: u64,
     kill_token: u64,
-    epoll_raw_fd: RawFd,
+    ep: epoll::Epoll,
     sender: mpsc::Sender<Box<dyn EpollHandler>>,
 }
 
 impl EpollConfig {
     pub fn new(
         first_token: u64,
-        epoll_raw_fd: RawFd,
+        ep: epoll::Epoll,
         sender: mpsc::Sender<Box<dyn EpollHandler>>,
     ) -> Self {
         EpollConfig {
             queue_avail_token: first_token,
             kill_token: first_token + 1,
-            epoll_raw_fd,
+            ep,
             sender,
         }
     }
@@ -531,22 +531,25 @@ impl VirtioDevice for Block {
             // the channel should be open at this point
             self.epoll_config.sender.send(Box::new(handler)).unwrap();
 
-            epoll::ctl(
-                self.epoll_config.epoll_raw_fd,
-                epoll::EPOLL_CTL_ADD,
-                queue_evt_raw_fd,
-                epoll::Event::new(epoll::EPOLLIN, self.epoll_config.queue_avail_token),
-            )
-            .map_err(ActivateError::EpollCtl)?;
-
-            epoll::ctl(
-                self.epoll_config.epoll_raw_fd,
-                epoll::EPOLL_CTL_ADD,
-                kill_evt_raw_fd,
-                epoll::Event::new(epoll::EPOLLIN, self.epoll_config.kill_token),
-            )
-            .map_err(ActivateError::EpollCtl)?;
-
+            self.epoll_config
+                .ep
+                .ctl(
+                    epoll::ControlOperation::Add,
+                    queue_evt_raw_fd,
+                    epoll::EpollEvent::new(
+                        epoll::EventSet::IN,
+                        self.epoll_config.queue_avail_token,
+                    ),
+                )
+                .map_err(ActivateError::EpollCtl)?;
+            self.epoll_config
+                .ep
+                .ctl(
+                    epoll::ControlOperation::Add,
+                    kill_evt_raw_fd,
+                    epoll::EpollEvent::new(epoll::EventSet::IN, self.epoll_config.kill_token),
+                )
+                .map_err(ActivateError::EpollCtl)?;
             return Ok(());
         }
 
