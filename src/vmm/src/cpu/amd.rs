@@ -1,5 +1,9 @@
-// Copyright 2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
+//
+// Portions Copyright 2023 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 use super::{
     common::get_vendor_id_from_host,
     cpuid, cpuid_count,

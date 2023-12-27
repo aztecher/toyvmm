@@ -1,3 +1,6 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 use vmm::builder::{build_and_boot_vm, StartVmError};
 use vmm::resources::VmResources;
 

@@ -1,3 +1,6 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 use std::os::unix::io::RawFd;
 use std::result::Result;
 

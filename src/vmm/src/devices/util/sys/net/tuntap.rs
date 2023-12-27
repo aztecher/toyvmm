@@ -1,3 +1,6 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // extern in src/lib.rs
 use super::if_tun::sock_fprog;
 use utils::{ioctl_ior_nr, ioctl_iow_nr};
