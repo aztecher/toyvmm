@@ -1,4 +1,6 @@
 # ToyVMM (Toy Virtual Machine Monitor)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Faztecher%2Ftoyvmm.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Faztecher%2Ftoyvmm?ref=badge_shield)
+
 
 <p>
   <a alia-label="Build" href="https://app.travis-ci.com/aztecher/toyvmm">
@@ -12,6 +14,9 @@
   </a>
 </p>
 
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Faztecher%2Ftoyvmm.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Faztecher%2Ftoyvmm?ref=badge_large)
 
 ## Overview
 
