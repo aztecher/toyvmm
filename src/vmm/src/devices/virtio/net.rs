@@ -1,4 +1,7 @@
-// Copyright 2017 The Chromium OS Authors. All rights reserved.
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Portions Copyright 2017 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -16,7 +19,6 @@ use crate::devices::{
     },
 };
 use crate::vstate::memory::GuestMemoryMmap;
-// use epoll;
 use std::io::{Read, Write};
 use std::mem;
 use std::os::unix::io::AsRawFd;

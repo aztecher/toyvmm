@@ -1,3 +1,6 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 use super::EventFdTrigger;
 use crate::devices::bus::BusDevice;
 use std::io::Write;

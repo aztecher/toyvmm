@@ -1,3 +1,13 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Portions Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Portions Copyright 2017 The Chromium OS Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the THIRD-PARTY file.
+
 use crate::{arch, vstate::memory::GuestMemoryMmap};
 use kvm_bindings::{
     kvm_pit_config, kvm_userspace_memory_region, CpuId, KVM_MAX_CPUID_ENTRIES,
@@ -40,7 +50,7 @@ pub enum VmError {
     // VmFd(kvm_ioctls::Error),
     // // Failed to get mmap size
     // VcpuMmapSize(kvm_ioctls::Error),
-    /// Cannot set memory region.  
+    /// Cannot set memory region.
     #[error("Cannot set memory resion: {0}")]
     SetUserMemoryRegion(kvm_ioctls::Error),
 }

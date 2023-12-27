@@ -1,3 +1,6 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::utils::util::get_page_size;
 use std::os::unix::io::AsRawFd;
 use vm_memory::{

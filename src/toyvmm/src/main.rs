@@ -1,3 +1,6 @@
+// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 use clap::{Parser, Subcommand};
 use std::fs::read_to_string;
 use std::path::PathBuf;

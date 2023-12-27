@@ -29,7 +29,7 @@ Book ([en](https://aztecher.github.io/en/) / [ja](https://aztecher.github.io/ja/
 As we expand the implementation of ToyVMM, we plan to enhance the contents of the book as well.
 If you find any mistakes or my misunderstandings in the documentation, please feel free to submit an issue to the [toyvmm-book](https://github.com/aztecher/toyvmm-book) repository.
 
-**CHANGE LOG**
+**BOOK CHANGE LOG**
 
 * Dec 27, 2023 : Add contents about SMP only in ja.
 * Sep 24, 2023 : Add 'Virtio' contents and translate all existing contents into ja / en.
@@ -43,8 +43,7 @@ Please see the [quickstart guide](./docs/getting-started.md) to launch your VM u
 ## Features and Capabilities
 
 * Can run a virtual machine!
-* Customizing the memory size of your virtual machine is available.
-  * Currently only one vCPU is supported, but support for multiple vCPUs is planned for implementation.
+* Customizing the number of vCPU and memory size of your virtual machine is available.
 * Support virtio-blk and virtio-net to execute disk and network I/O in virtual machine.
   * Thanks to the virtio-blk, toyvmm can launch the guest OS from rootfs images like ubuntu-18.04.ext4, not only initramfs.
   * Thanks to the virtio-net, the virtual machine can reach out of the host (requires the host-side iptables setting).
