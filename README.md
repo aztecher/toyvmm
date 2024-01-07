@@ -4,9 +4,6 @@
   <a alia-label="Build" href="https://app.travis-ci.com/aztecher/toyvmm">
     <img alt="" src="https://img.shields.io/travis/com/aztecher/toyvmm.svg?style=for-the-badge&logo=travisci">
   </a>
-  <!-- <a alia-label="License" href=""> -->
-  <!--   <img alt="" src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge"> -->
-  <!-- </a> -->
   <a alia-label="Book" href="https://aztecher.github.io/en/">
     <img alt="" src="https://img.shields.io/badge/read%20the-book-9cf.svg?style=for-the-badge&logo=mdbook">
   </a>
@@ -47,3 +44,8 @@ Please see the [quickstart guide](./docs/getting-started.md) to launch your VM u
 * Support virtio-blk and virtio-net to execute disk and network I/O in virtual machine.
   * Thanks to the virtio-blk, toyvmm can launch the guest OS from rootfs images like ubuntu-18.04.ext4, not only initramfs.
   * Thanks to the virtio-net, the virtual machine can reach out of the host (requires the host-side iptables setting).
+
+## License
+
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B42035%2Fgithub.com%2Faztecher%2Ftoyvmm.svg?type=large&issueType=license)](https://app.fossa.com/projects/custom%2B42035%2Fgithub.com%2Faztecher%2Ftoyvmm?ref=badge_large&issueType=license)
+
