@@ -18,6 +18,7 @@ target/
 
 
 build/
-vmlinux.bin
+vmlinux*
 initrd.img
-ubuntu-18.04.ext4
+ubuntu-*
+squashfs-root

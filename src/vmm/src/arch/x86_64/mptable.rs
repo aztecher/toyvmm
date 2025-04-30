@@ -50,8 +50,8 @@ const CPU_STEPPING: u32 = 0x600;
 const CPU_FEATURE_APIC: u32 = 0x200;
 const CPU_FEATURE_FPU: u32 = 0x001;
 const BUS_TYPE_ISA: [u8; 6] = char_array!(u8; 'I', 'S', 'A', ' ', ' ', ' ');
-const IO_APIC_DEFAULT_PHYS_BASE: u32 = 0xfec0_0000;
-const APIC_DEFAULT_PHYS_BASE: u32 = 0xfee0_0000;
+pub const IO_APIC_DEFAULT_PHYS_BASE: u32 = 0xfec0_0000;
+pub const APIC_DEFAULT_PHYS_BASE: u32 = 0xfee0_0000;
 const APIC_VERSION: u8 = 0x14;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]

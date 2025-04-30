@@ -9,3 +9,4 @@
 // found in the THIRD-PARTY file.
 
 pub const IRQ_MAX: u32 = 23;
+pub const IRQ_BASE: u32 = 5;

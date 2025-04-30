@@ -6,6 +6,10 @@
 // found in the LICENSE file.
 
 use crate::{
+    acpi::{
+        aml,
+        aml::{Aml, AmlError},
+    },
     devices::{
         bus::{Bus, BusDevice},
         virtio::{
@@ -21,6 +25,7 @@ use crate::{
 };
 use kvm_ioctls::IoEventAddress;
 use linux_loader::cmdline;
+use std::convert::TryInto;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, thiserror::Error)]
@@ -43,13 +48,52 @@ pub enum MmioDeviceError {
     /// No more IRQs are available.
     #[error("No more irqs are available")]
     IrqsExausted,
+    /// Failed to set AML for virtio-mmio
+    #[error("Failed to set AML for virtio-mmio: {0}")]
+    SetupAml(AmlError),
 }
 
 const MAX_IRQ: u32 = 15;
 
+pub fn add_virtio_aml(
+    dsdt_data: &mut Vec<u8>,
+    addr: u64,
+    len: u64,
+    irq: u32,
+) -> Result<(), AmlError> {
+    let dev_id = irq - crate::arch::x86_64::layout::IRQ_BASE;
+    aml::Device::new(
+        format!("V{:03}", dev_id).as_str().try_into()?,
+        vec![
+            &aml::Name::new("_HID".try_into()?, &"LNRO0005")?,
+            &aml::Name::new("_UID".try_into()?, &dev_id)?,
+            &aml::Name::new("_CCA".try_into()?, &aml::ONE)?,
+            &aml::Name::new(
+                "_CRS".try_into()?,
+                &aml::ResourceTemplate::new(vec![
+                    &aml::Memory32Fixed::new(
+                        true,
+                        addr.try_into().unwrap(),
+                        len.try_into().unwrap(),
+                    ),
+                    &aml::Interrupt::new(true, true, false, false, irq),
+                ]),
+            )?,
+        ],
+    )
+    .append_aml_bytes(dsdt_data)
+}
+
+pub struct MmioDeviceInfo {
+    pub addr: u64,
+    pub len: u64,
+    pub irq: u32,
+}
+
 pub struct MmioDeviceManager {
     pub bus: Bus,
     pub vm_requests: Vec<VmRequest>,
+    pub device_requests: Vec<MmioDeviceInfo>,
     guest_mem: GuestMemoryMmap,
     mmio_len: u64,
     mmio_base: u64,
@@ -66,6 +110,7 @@ impl MmioDeviceManager {
         MmioDeviceManager {
             bus: Bus::new(),
             vm_requests: Vec::new(),
+            device_requests: Vec::new(),
             guest_mem,
             mmio_len,
             mmio_base,
@@ -77,6 +122,7 @@ impl MmioDeviceManager {
         &mut self,
         device: Box<dyn VirtioDevice>,
         cmdline: &mut cmdline::Cmdline,
+        enable_acpi: bool,
     ) -> Result<(), MmioDeviceError> {
         if self.irq > MAX_IRQ {
             return Err(MmioDeviceError::IrqsExausted);
@@ -111,12 +157,20 @@ impl MmioDeviceManager {
             )
             .unwrap();
 
-        cmdline
-            .insert(
-                "virtio_mmio.device",
-                &format!("4K@0x{:08x}:{}", self.mmio_base, self.irq),
-            )
-            .map_err(MmioDeviceError::Cmdline)?;
+        if enable_acpi {
+            self.device_requests.push(MmioDeviceInfo {
+                addr: self.mmio_base,
+                len: self.mmio_len,
+                irq: self.irq,
+            });
+        } else {
+            cmdline
+                .insert(
+                    "virtio_mmio.device",
+                    &format!("4K@0x{:08x}:{}", self.mmio_base, self.irq),
+                )
+                .map_err(MmioDeviceError::Cmdline)?;
+        }
         self.mmio_base += self.mmio_len;
         self.irq += 1;
 

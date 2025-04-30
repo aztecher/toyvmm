@@ -97,5 +97,27 @@ ping -c 1 192.168.0.1
 ```
 
 Additionally, by setting the default route on the VM side, and configuring iptables and enabling IP forwarding on the host side, you can also allow the VM to access the Internet.  
-However, this will not be covered in detail here.
 
+```bash
+# On Host, allow ipv4_forward and enable masquarade
+sudo sh -c 'echo 1 > /proc/sys/net/ipv4/ip_forward'
+sudo iptables -t nat -A POSTROUTING -o ${HOST_NIC} -j MASQUERADE
+
+# On Guest, set nameserver to 8.8.8.8
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+ip route add default via 192.168.0.1 dev eth0
+```
+
+After these configurations, you can access to the internet from Guest VM.
+
+```bash
+# ping from Guest VM to www.google.com
+ping -c 3  www.google.com
+PING www.google.com (142.251.42.164): 56 data bytes
+64 bytes from 142.251.42.164: icmp_seq=0 ttl=115 time=5.516 ms
+64 bytes from 142.251.42.164: icmp_seq=1 ttl=115 time=5.906 ms
+64 bytes from 142.251.42.164: icmp_seq=2 ttl=115 time=6.426 ms
+--- www.google.com ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 5.516/5.949/6.426/0.373 ms
+```

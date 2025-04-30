@@ -27,3 +27,5 @@ thiserror = "1.0.47"
 derive_more = { version = "0.99.17", default-features = false, features = ["from", "display"] }
 
 utils = { path = "../utils" }
+zerocopy = { version = "0.8.24", features = ["alloc", "derive"] }
+displaydoc = "0.2.5"
