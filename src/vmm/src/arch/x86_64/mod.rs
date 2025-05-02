@@ -35,13 +35,16 @@ pub const KVM_TSS_ADDRESS: u64 = 0xfffb_d000;
 // The 'zero page', a.k.a linux kernel bootparam
 const ZERO_PAGE_START: u64 = 0x7000;
 
-const EBDA_START: u64 = 0x9fc00;
+const EBDA_START: u64 = 0xa0000;
 const E820_RAM: u32 = 1;
 const FIRST_ADDR_PAST_32BITS: u64 = 1 << 32;
 const MEM_32BIT_GAP_SIZE: u64 = 768 << 20;
 pub const MMIO_MEM_START: u64 = FIRST_ADDR_PAST_32BITS - MEM_32BIT_GAP_SIZE;
 
 pub const CMDLINE_MAX_SIZE: usize = 0x10000;
+
+// Need to change
+pub const RSDP_POINTER: GuestAddress = GuestAddress(EBDA_START);
 
 /// Errors associated with the architecture related operations.
 #[derive(Debug, thiserror::Error)]
@@ -58,6 +61,9 @@ pub enum ArchError {
     /// Error writing MP table to memory.
     #[error("MP table setup failure: {0}")]
     MpTableSetup(#[from] mptable::MptableError),
+    /// RSDP address doesn't within the geust memory
+    #[error("RSDP extends past the end of guest memory")]
+    RsdpPastRamEnd,
 }
 
 pub const PAGE_SIZE: usize = 4096;
@@ -109,6 +115,7 @@ pub fn configure_system(
     cmdline_size: usize,
     initrd: &Option<InitrdConfig>,
     num_cpus: u8,
+    rsdp_addr: GuestAddress,
 ) -> Result<(), ArchError> {
     // https://www.kernel.org/doc/html/latest/x86/boot.html
     const KERNEL_TYPE_OF_LOADER: u8 = 0xff;
@@ -129,8 +136,13 @@ pub fn configure_system(
         params.hdr.ramdisk_image = initrd_config.address.raw_value() as u32;
         params.hdr.ramdisk_size = initrd_config.size as u32;
     }
+    if rsdp_addr.0 > guest_mem.last_addr().0 {
+        return Err(ArchError::RsdpPastRamEnd);
+    }
+    params.acpi_rsdp_addr = rsdp_addr.0;
 
     add_e820_entry(&mut params, 0, EBDA_START, E820_RAM)?;
+
     let first_addr_past_32bits = GuestAddress(FIRST_ADDR_PAST_32BITS);
     let end_32bit_gap_start = GuestAddress(MMIO_MEM_START);
     let himem_start = GuestAddress(HIGH_MEMORY_START);
@@ -219,7 +231,7 @@ pub mod tests {
     #[test]
     fn test_system_configuration_should_panic() {
         let gm = memory::create_guest_memory(&[(None, GuestAddress(0), 128 << 20)], false).unwrap();
-        let res = configure_system(&gm, GuestAddress(0), 0, &None, 1);
+        let res = configure_system(&gm, GuestAddress(0), 0, &None, 1, GuestAddress(0));
         assert!(res.is_ok());
     }
 

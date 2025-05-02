@@ -1,6 +1,6 @@
 {
 	"boot-source": {
-		"kernel_path": "./vmlinux.bin",
+		"kernel_path": "./vmlinux-5.10.236",
 		"boot_args": "console=ttyS0 reboot=k panic=1"
 	},
 	"drives": [
@@ -13,5 +13,11 @@
 		"vcpu_count": 4,
 		"mem_size_mib": 8192,
 		"track_dirty_page": false
-	}
+	},
+        "features": [
+                {
+                        "feature": "acpi",
+                        "enable": true
+                }
+        ]
 }

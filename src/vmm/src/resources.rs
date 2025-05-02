@@ -1,4 +1,4 @@
-// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Portions Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -10,6 +10,7 @@ use crate::vmm_config::boot_source::{
     BootConfig, BootSource, BootSourceConfig, BootSourceConfigError,
 };
 use crate::vmm_config::drive::{BlockDeviceBuilder, BlockDeviceConfig, DriveError};
+use crate::vmm_config::feature::{FeatureConfig, FeatureError, FeatureGateController};
 use crate::vmm_config::machine_config::{MachineConfig, VmConfig, VmConfigError};
 
 /// Errors associated with actions on configuring VM resources.
@@ -27,6 +28,9 @@ pub enum ResourcesError {
     /// Vm vcpus or memory configuration error.
     #[error("VM config error: {0}")]
     VmConfig(VmConfigError),
+    /// Features config error.
+    #[error("Features config error: {0}")]
+    FeatureGate(FeatureError),
 }
 
 /// Used for configuring a vmm from json.
@@ -38,6 +42,8 @@ pub struct VmmConfig {
     block_devices: Vec<BlockDeviceConfig>,
     #[serde(rename = "machine-config")]
     machine_config: MachineConfig,
+    #[serde(rename = "features")]
+    features: Option<Vec<FeatureConfig>>,
 }
 
 /// A data structure that encapsulates the device configurations held in the Vmm.
@@ -46,6 +52,7 @@ pub struct VmResources {
     pub vm_config: VmConfig,
     pub boot_source: BootSource,
     pub block: BlockDeviceBuilder,
+    pub feature_config: Vec<FeatureConfig>,
 }
 
 impl VmResources {
@@ -56,6 +63,7 @@ impl VmResources {
         resources.build_vm_config(vmm_config.machine_config)?;
         resources.build_boot_source(vmm_config.boot_source)?;
         resources.set_block_device_builder(vmm_config.block_devices)?;
+        resources.build_feature_config(vmm_config.features);
         Ok(resources)
     }
 
@@ -103,6 +111,21 @@ impl VmResources {
     ) -> Result<(), DriveError> {
         self.block = BlockDeviceBuilder::from(devices)?;
         Ok(())
+    }
+
+    pub fn build_feature_config(&mut self, feature_cfg: Option<Vec<FeatureConfig>>) {
+        match feature_cfg {
+            Some(cfg) => self.feature_config = cfg,
+            None => self.feature_config = Vec::new(),
+        }
+    }
+
+    /// Build feature gate controller
+    pub fn dispatch_feature_gate_controller(
+        &self,
+    ) -> Result<FeatureGateController, ResourcesError> {
+        FeatureGateController::from_config(&self.feature_config)
+            .map_err(ResourcesError::FeatureGate)
     }
 
     ///

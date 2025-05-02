@@ -1,11 +1,11 @@
-// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Portions Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    arch, cpu,
+    acpi_table, arch, cpu,
     device_manager::{
         legacy::PortIoDeviceManager,
         mmio::{MmioDeviceError, MmioDeviceManager},
@@ -55,6 +55,9 @@ pub enum StartVmError {
     /// Failed to insert string to cmdline.
     #[error("Failed to insert string to cmdline: {0}")]
     InsertCommandline(linux_loader::cmdline::Error),
+    /// Failed to setup ACPI
+    #[error("Failed to setup ACPI: {0}")]
+    SetupACPI(acpi_table::AcpiTableError),
     /// Failed to load cmdline
     #[error("Failed to load cmdline: {0}")]
     LoadCommandline(linux_loader::loader::Error),
@@ -80,17 +83,21 @@ pub enum StartVmError {
     /// Cannot open the block device backing file.
     #[error("Cannot open the block device backing file: {0}")]
     OpenBlockDevice(std::io::Error),
-    /// Clould not create a block device.
+    /// Could not create a block device.
     #[error("Clould not create a block device: {0}")]
     CreateBlockDevice(BlockError),
-    /// Clould not create a net device.
+    /// Could not create a net device.
     #[error("Clould not create a net device: {0}")]
     CreateNetDevice(NetError),
     /// Cannot initialize a MMIO Device or add a device to the MMIO Bus or cmdline.
     #[error("Cannot initialize a MMIO Device or add a device to the MMIO Bus or cmdline: {0}")]
     RegisterMmioDevice(MmioDeviceError),
+    /// Cannot initialize a epoll context for mmio device
     #[error("Cannot initialize a epoll context for mmio device: {0}")]
     EpollCtx(epoll::EpollContextError),
+    /// Could not dispatch feature gate controller
+    #[error("Could not dispatch feature gate controiller: {0}")]
+    DispathFeatureGate(resources::ResourcesError),
 }
 
 pub struct InitrdConfig {
@@ -258,9 +265,11 @@ fn attach_block_devices(
     vm_resources: &mut resources::VmResources,
     epoll_ctx: &mut epoll::EpollContext,
     mmio_device_manager: &mut MmioDeviceManager,
+    enable_acpi: bool,
 ) -> Result<(), StartVmError> {
     let drives = vm_resources.block.devices.clone();
     let boot_cmdline = vm_resources.cmdline_mut();
+
     for drive in drives {
         // TODO: multiple root device validation is finished in vmresources and expected to be
         // sorted.
@@ -280,7 +289,7 @@ fn attach_block_devices(
             Block::new(drive_file, epoll_config).map_err(StartVmError::CreateBlockDevice)?,
         );
         mmio_device_manager
-            .register_mmio(block, boot_cmdline)
+            .register_mmio(block, boot_cmdline, enable_acpi)
             .map_err(StartVmError::RegisterMmioDevice)?;
     }
     Ok(())
@@ -290,12 +299,13 @@ fn attach_net_devices(
     vm_resources: &mut resources::VmResources,
     epoll_ctx: &mut epoll::EpollContext,
     mmio_device_manager: &mut MmioDeviceManager,
+    enable_acpi: bool,
 ) -> Result<(), StartVmError> {
     let epoll_config = epoll_ctx.allocate_virtio_net_tokens();
     let net = Box::new(Net::new(epoll_config).map_err(StartVmError::CreateNetDevice)?);
     let boot_cmdline = vm_resources.cmdline_mut();
     mmio_device_manager
-        .register_mmio(net, boot_cmdline)
+        .register_mmio(net, boot_cmdline, enable_acpi)
         .map_err(StartVmError::RegisterMmioDevice)?;
     Ok(())
 }
@@ -315,6 +325,13 @@ fn configure_system_for_boot(
             .map_err(VmmError::VcpuConfigure)
             .map_err(StartVmError::Internal)?;
     }
+    let rsdp_addr = acpi_table::create_acpi_tables(
+        &vmm.guest_memory,
+        &vmm.mmio_device_manager,
+        &vmm.pio_device_manager,
+        vcpus.len() as u8,
+    )
+    .map_err(StartVmError::SetupACPI)?;
 
     let boot_cmdline = vm_resources.cmdline();
     // Load cmdline
@@ -333,6 +350,7 @@ fn configure_system_for_boot(
         cmdline_size,
         initrd,
         num_cpus as u8,
+        rsdp_addr,
     )
     .map_err(StartVmError::ConfigureSystem)?;
     Ok(())
@@ -519,15 +537,26 @@ pub fn build_and_boot_vm(mut vm_resources: resources::VmResources) -> Result<(),
 
     let mut epoll_context =
         epoll::EpollContext::new(vcpu_exit_evt.as_raw_fd()).map_err(EpollCtx)?;
+
+    // ACPI handling for feature gate
+    let fg = vm_resources
+        .dispatch_feature_gate_controller()
+        .map_err(StartVmError::DispathFeatureGate)?;
+    let enable_acpi = match fg.feature_gate("acpi") {
+        Some(acpi_feature) => acpi_feature.enable(),
+        None => false,
+    };
     attach_block_devices(
         &mut vm_resources,
         &mut epoll_context,
         &mut vmm.mmio_device_manager,
+        enable_acpi,
     )?;
     attach_net_devices(
         &mut vm_resources,
         &mut epoll_context,
         &mut vmm.mmio_device_manager,
+        enable_acpi,
     )?;
     vmm.mmio_device_manager
         .setup_event_notifier(&vmm.vm)
@@ -563,7 +592,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::{
         arch,
-        vmm_config::{boot_source, drive, machine_config},
+        vmm_config::{boot_source, drive, feature, machine_config},
     };
     use ::utils::tempfile::TempFile;
     use std::io::Write;
@@ -594,11 +623,13 @@ pub(crate) mod tests {
         vm_config: machine_config::VmConfig,
         boot_source: boot_source::BootSource,
         block: drive::BlockDeviceBuilder,
+        feature_config: Vec<feature::FeatureConfig>,
     ) -> resources::VmResources {
         resources::VmResources {
             vm_config,
             boot_source,
             block,
+            feature_config,
         }
     }
 
@@ -622,7 +653,11 @@ pub(crate) mod tests {
             config: boot_source_config,
             builder: Some(boot_config),
         };
-        make_test_vm_resources(vm_config, boot_source, block)
+        let feature_config = feature::FeatureConfig {
+            feature: "test".to_string(),
+            enable: false,
+        };
+        make_test_vm_resources(vm_config, boot_source, block, vec![feature_config])
     }
 
     fn default_vm_resources() -> resources::VmResources {
@@ -713,6 +748,7 @@ pub(crate) mod tests {
                 &mut vm_resources,
                 &mut epoll_context,
                 &mut mmio_device_manager,
+                false,
             )
             .is_ok());
             assert!(!cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
@@ -738,6 +774,7 @@ pub(crate) mod tests {
                 &mut vm_resources,
                 &mut epoll_context,
                 &mut mmio_device_manager,
+                false,
             )
             .is_ok());
             assert!(cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
@@ -768,6 +805,7 @@ pub(crate) mod tests {
                 &mut vm_resources,
                 &mut epoll_context,
                 &mut mmio_device_manager,
+                false,
             )
             .is_ok());
             assert!(cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
@@ -794,6 +832,7 @@ pub(crate) mod tests {
             &mut vm_resources,
             &mut epoll_context,
             &mut mmio_device_manager,
+            false,
         )
         .is_ok());
     }
