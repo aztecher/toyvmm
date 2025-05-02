@@ -1,4 +1,6 @@
-// Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
+//
+// Portions Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 use std::mem::size_of;
@@ -44,10 +46,10 @@ const HYPERVISOR_VENDOR_ID: [u8; 8] = *b"TOYVMM  ";
 
 #[derive(Debug, thiserror::Error)]
 /// Error type for ACPI related operations
-pub enum AcpiError {
-    /// ACPI tables error
-    #[error("ACPI tables error: {0}")]
-    AcpiTables(acpi::AcpiError),
+pub enum AcpiTableError {
+    /// ACPI tables write error
+    #[error("ACPI tables write error: {0}")]
+    Write(acpi::AcpiError),
     /// Error creating AML bytecode
     #[error("Error creating AML bytecode: {0}")]
     AmlError(aml::AmlError),
@@ -68,13 +70,13 @@ impl AcpiTableWriter<'_> {
         &mut self,
         table: &mut S,
         addr: GuestAddress,
-    ) -> Result<(), AcpiError>
+    ) -> Result<(), AcpiTableError>
     where
         S: Sdt,
     {
         table
             .write_to_guest(self.mem, addr)
-            .map_err(AcpiError::AcpiTables)?;
+            .map_err(AcpiTableError::Write)?;
         Ok(())
     }
 
@@ -84,27 +86,31 @@ impl AcpiTableWriter<'_> {
         mmio_device_manager: &MmioDeviceManager,
         pio_device_manager: &PortIoDeviceManager,
         dsdt_offset: GuestAddress,
-    ) -> Result<u64, AcpiError> {
+    ) -> Result<u64, AcpiTableError> {
         let mut dsdt_data = Vec::new();
 
         // Virtio device
         for (_, dev_info) in mmio_device_manager.device_requests.iter().enumerate() {
             add_virtio_aml(&mut dsdt_data, dev_info.addr, dev_info.len, dev_info.irq)
-                .map_err(AcpiError::AmlError)?;
+                .map_err(AcpiTableError::AmlError)?;
         }
 
         // Architecture specific DSDT data
         pio_device_manager.append_aml_bytes(&mut dsdt_data).unwrap();
 
         let mut dsdt = Dsdt::new(OEM_ID, *b"TVDSDT  ", OEM_REVISION, dsdt_data);
-        self.write_acpi_table(&mut dsdt, dsdt_offset);
+        let _ = self.write_acpi_table(&mut dsdt, dsdt_offset)?;
         Ok(dsdt.len() as u64)
     }
 
     /// Build the FADT table for the guest
     ///
     /// This includes a pointer with the location of the DSDT in guest memory
-    fn build_fadt(&mut self, dsdt_addr: u64, fadt_offset: GuestAddress) -> Result<u64, AcpiError> {
+    fn build_fadt(
+        &mut self,
+        dsdt_addr: u64,
+        fadt_offset: GuestAddress,
+    ) -> Result<u64, AcpiTableError> {
         let mut fadt = Fadt::new(OEM_ID, *b"FCVMFADT", OEM_REVISION);
         fadt.set_hypervisor_vendor_id(HYPERVISOR_VENDOR_ID);
         fadt.set_x_dsdt(dsdt_addr);
@@ -113,14 +119,18 @@ impl AcpiTableWriter<'_> {
         );
         setup_arch_fadt(&mut fadt);
 
-        self.write_acpi_table(&mut fadt, fadt_offset);
+        let _ = self.write_acpi_table(&mut fadt, fadt_offset)?;
         Ok(fadt.len() as u64)
     }
 
     /// Build the MADT table for the guest
     ///
     /// This includes information about the interrupt controllers supported in the platform
-    fn build_madt(&mut self, nr_vcpus: u8, madt_offset: GuestAddress) -> Result<u64, AcpiError> {
+    fn build_madt(
+        &mut self,
+        nr_vcpus: u8,
+        madt_offset: GuestAddress,
+    ) -> Result<u64, AcpiTableError> {
         let mut madt = Madt::new(
             OEM_ID,
             *b"FCVMMADT",
@@ -128,7 +138,7 @@ impl AcpiTableWriter<'_> {
             APIC_DEFAULT_PHYS_BASE,
             setup_interrupt_controllers(nr_vcpus),
         );
-        self.write_acpi_table(&mut madt, madt_offset);
+        let _ = self.write_acpi_table(&mut madt, madt_offset)?;
         Ok(madt.len() as u64)
     }
 
@@ -139,9 +149,9 @@ impl AcpiTableWriter<'_> {
         &mut self,
         tables: Vec<u64>,
         xsdt_offset: GuestAddress,
-    ) -> Result<u64, AcpiError> {
+    ) -> Result<u64, AcpiTableError> {
         let mut xsdt = Xsdt::new(OEM_ID, *b"FCMVXSDT", OEM_REVISION, tables);
-        self.write_acpi_table(&mut xsdt, xsdt_offset);
+        let _ = self.write_acpi_table(&mut xsdt, xsdt_offset)?;
         Ok(xsdt.len() as u64)
     }
 
@@ -150,10 +160,10 @@ impl AcpiTableWriter<'_> {
     /// This will build the RSDP pointer which points to the XSDT table and write it in guest
     /// memory. The address in which we write RSDP is pre-determined for every architecture.
     /// We will not allocate arbitrary memory for it
-    fn build_rsdp(&mut self, xsdt_addr: u64) -> Result<(), AcpiError> {
+    fn build_rsdp(&mut self, xsdt_addr: u64) -> Result<(), AcpiTableError> {
         let mut rsdp = Rsdp::new(OEM_ID, xsdt_addr);
-        rsdp.write_to_guest(self.mem, RSDP_POINTER).unwrap();
-        Ok(())
+        rsdp.write_to_guest(self.mem, RSDP_POINTER)
+            .map_err(AcpiTableError::Write)
     }
 }
 
@@ -166,7 +176,7 @@ pub(crate) fn create_acpi_tables(
     mmio_device_manager: &MmioDeviceManager,
     pio_device_manager: &PortIoDeviceManager,
     nr_vcpus: u8,
-) -> Result<GuestAddress, AcpiError> {
+) -> Result<GuestAddress, AcpiTableError> {
     let mut writer = AcpiTableWriter { mem };
     let mut tables = Vec::new();
 
@@ -216,16 +226,3 @@ pub(crate) fn setup_arch_fadt(fadt: &mut Fadt) {
             | (1 << IAPC_BOOT_ARG_FLAGS_MSI_NOT_PRESENT),
     );
 }
-
-// #[inline(always)]
-// pub(crate) fn setup_arch_dsdt(dsdt_data: &mut Vec<u8>) -> Result<(), aml::AmlError> {
-//     PortIODeviceManager::append_aml_bytes(dsdt_data)
-// }
-//
-// pub(crate) const fn apic_addr() -> u32 {
-//     layout::APIC_ADDR
-// }
-//
-// pub(crate) const fn rsdp_addr() -> GuestAddress {
-//     GuestAddress(layout::RSDP_ADDR)
-// }

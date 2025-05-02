@@ -1,5 +1,7 @@
-// Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// Copyright 2023 Rivos, Inc.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
+//
+// Portions Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Portions Copyright 2023 Rivos, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -9,7 +11,7 @@ use vm_memory::{Address, Bytes, GuestAddress, GuestMemory};
 use zerocopy::little_endian::U32;
 use zerocopy::{Immutable, IntoBytes};
 
-use super::{checksum, AcpiError, Result, Sdt, SdtHeader};
+use super::{checksum, AcpiError, Sdt, SdtHeader};
 
 const MADT_CPU_ENABLE_FLAG: u32 = 0;
 
@@ -130,7 +132,11 @@ impl Sdt for Madt {
         self.header.sdt.length.get().try_into().unwrap()
     }
 
-    fn write_to_guest<M: GuestMemory>(&mut self, mem: &M, address: GuestAddress) -> Result<()> {
+    fn write_to_guest<M: GuestMemory>(
+        &mut self,
+        mem: &M,
+        address: GuestAddress,
+    ) -> Result<(), AcpiError> {
         mem.write_slice(self.header.as_bytes(), address)?;
         let address = address
             .checked_add(size_of::<MadtHeader>() as u64)
@@ -140,81 +146,3 @@ impl Sdt for Madt {
         Ok(())
     }
 }
-
-// use super::sdt::Sdt;
-// use crate::arch::x86_64::mptable::{APIC_DEFAULT_PHYS_BASE, IO_APIC_DEFAULT_PHYS_BASE};
-// use zerocopy::{FromBytes, Immutable, IntoBytes};
-//
-// const MADT_CPU_ENABLE_FLAG: u32 = 0;
-// const MADT_CPU_ONLINE_CAPABLE_FLAG: usize = 1;
-//
-// #[repr(C, packed)]
-// #[derive(Default, IntoBytes, Immutable, FromBytes)]
-// pub struct LocalApic {
-//     r#type: u8,
-//     length: u8,
-//     processor_uid: u8,
-//     apic_id: u8,
-//     flags: u32,
-// }
-//
-// #[repr(C, packed)]
-// #[derive(IntoBytes, Immutable, FromBytes)]
-// struct LocalX2Apic {
-//     pub r#type: u8,
-//     pub length: u8,
-//     pub _reserved: u16,
-//     pub apic_id: u32,
-//     pub flags: u32,
-//     pub processor_id: u32,
-// }
-//
-// #[repr(C, packed)]
-// #[derive(Default, IntoBytes, Immutable, FromBytes)]
-// struct IoApic {
-//     pub r#type: u8,
-//     pub length: u8,
-//     pub ioapic_id: u8,
-//     _reserved: u8,
-//     pub apic_address: u32,
-//     pub gsi_base: u32,
-// }
-//
-// pub fn create_table(nr_vcpus: u8) -> Sdt {
-//     let mut madt = Sdt::new(*b"APIC", 44, 5, *b"TOYVMM", *b"TVMADT  ", 0);
-//
-//     madt.write(36, APIC_DEFAULT_PHYS_BASE);
-//     for cpu_id in 0..nr_vcpus {
-//         let lapic = LocalApic {
-//             r#type: 0, // 0 = Processor Local APIC
-//             length: 8,
-//             processor_uid: cpu_id,
-//             apic_id: cpu_id,
-//             flags: 1u32 << MADT_CPU_ENABLE_FLAG,
-//         };
-//         // let lapic = LocalX2Apic {
-//         //     r#type: 9, // 9 = Processor Local x2APIC
-//         //     length: 16,
-//         //     processor_id: cpu_id as u32,
-//         //     apic_id: cpu_id as u32,
-//         //     flags: if cpu_id == 0 {
-//         //         1 << MADT_CPU_ENABLE_FLAG
-//         //     } else {
-//         //         0
-//         //     } | (1 << MADT_CPU_ONLINE_CAPABLE_FLAG),
-//         //     _reserved: 0,
-//         // };
-//         madt.append(lapic);
-//     }
-//     madt.append(IoApic {
-//         r#type: 1, // 1 = I/O APIC
-//         length: 12,
-//         ioapic_id: 0,
-//         apic_address: IO_APIC_DEFAULT_PHYS_BASE,
-//         gsi_base: 0, // 0? 5?
-//         ..Default::default()
-//     });
-//     madt.update_checksum();
-//
-//     madt
-// }

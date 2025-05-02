@@ -1,4 +1,6 @@
-// Copyright © 2019 Intel Corporation
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
+//
+// Portions Copyright © 2019 Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -7,9 +9,7 @@ pub mod aml;
 pub mod dsdt;
 pub mod fadt;
 pub mod madt;
-pub mod mcfg;
 pub mod rsdp;
-pub mod sdt;
 pub mod xsdt;
 
 use vm_memory::{GuestAddress, GuestMemory, GuestMemoryError};
@@ -26,8 +26,6 @@ pub fn checksum(buf: &[&[u8]]) -> u8 {
         .fold(0u8, |acc, x| acc.wrapping_add(*x)))
     .wrapping_add(1)
 }
-
-pub type Result<T> = std::result::Result<T, AcpiError>;
 
 /// ACPI type representing memory addresses
 #[repr(C, packed)]
@@ -98,5 +96,9 @@ pub trait Sdt {
     }
 
     /// Write the table in guest memory
-    fn write_to_guest<M: GuestMemory>(&mut self, mem: &M, address: GuestAddress) -> Result<()>;
+    fn write_to_guest<M: GuestMemory>(
+        &mut self,
+        mem: &M,
+        address: GuestAddress,
+    ) -> Result<(), AcpiError>;
 }

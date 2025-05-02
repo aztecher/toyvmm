@@ -1,6 +1,8 @@
-// Copyright © 2019 Intel Corporation
-// Copyright © 2023 Rivos, Inc.
-// Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
+//
+// Portions Copyright © 2019 Intel Corporation
+// Portions Copyright © 2023 Rivos, Inc.
+// Portions Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,7 +10,7 @@ use vm_memory::{Bytes, GuestAddress, GuestMemory};
 use zerocopy::little_endian::{U32, U64};
 use zerocopy::{Immutable, IntoBytes};
 
-use super::{checksum, Result, Sdt};
+use super::{checksum, AcpiError, Sdt};
 
 // clippy doesn't understand that we actually "use" the fields of this struct when we serialize
 // them as bytes in guest memory, so here we just ignore dead code to avoid having to name
@@ -61,75 +63,12 @@ impl Sdt for Rsdp {
         self.as_bytes().len()
     }
 
-    fn write_to_guest<M: GuestMemory>(&mut self, mem: &M, address: GuestAddress) -> Result<()> {
+    fn write_to_guest<M: GuestMemory>(
+        &mut self,
+        mem: &M,
+        address: GuestAddress,
+    ) -> Result<(), AcpiError> {
         mem.write_slice(self.as_bytes(), address)?;
         Ok(())
     }
 }
-
-// // Copyright © 2019 Intel Corporation
-// // Copyright © 2023 Rivos, Inc.
-// //
-// // SPDX-License-Identifier: Apache-2.0
-// //
-//
-// use zerocopy::{
-//     byteorder::{self, LE},
-//     Immutable, IntoBytes,
-// };
-//
-// type U32 = byteorder::U32<LE>;
-// type U64 = byteorder::U64<LE>;
-//
-// #[repr(C, packed)]
-// #[derive(Clone, Copy, Default, IntoBytes, Immutable)]
-// pub struct Rsdp {
-//     signature: [u8; 8],
-//     checksum: u8,
-//     oem_id: [u8; 6],
-//     revision: u8,
-//     _rsdt_addr: U32,
-//     length: U32,
-//     xsdt_addr: U64,
-//     extended_checksum: u8,
-//     _reserved: [u8; 3],
-// }
-//
-// impl Rsdp {
-//     pub fn new(oem_id: [u8; 6], xsdt_addr: u64) -> Self {
-//         let mut rsdp = Rsdp {
-//             signature: *b"RSD PTR ",
-//             checksum: 0,
-//             oem_id,
-//             revision: 2,
-//             _rsdt_addr: 0.into(),
-//             length: (core::mem::size_of::<Rsdp>() as u32).into(),
-//             xsdt_addr: xsdt_addr.into(),
-//             extended_checksum: 0,
-//             _reserved: [0; 3],
-//         };
-//         rsdp.checksum = super::generate_checksum(&rsdp.as_bytes()[0..20]);
-//         rsdp.extended_checksum = super::generate_checksum(rsdp.as_bytes());
-//         rsdp
-//     }
-//
-//     pub fn len() -> usize {
-//         core::mem::size_of::<Rsdp>()
-//     }
-// }
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn test_rsdp() {
-//         let rsdp = Rsdp::new(*b"CHYPER", 0xdead_beef);
-//         let sum = rsdp
-//             .as_bytes()
-//             .iter()
-//             .fold(0u8, |acc, x| acc.wrapping_add(*x));
-//         assert_eq!(sum, 0)
-//     }
-// }
-//

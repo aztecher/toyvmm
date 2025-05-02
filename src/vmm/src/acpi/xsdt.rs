@@ -1,3 +1,5 @@
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
+//
 // Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // Copyright 2023 Rivos, Inc.
 //
@@ -8,7 +10,7 @@ use std::mem::size_of;
 use vm_memory::{Address, Bytes, GuestAddress, GuestMemory};
 use zerocopy::IntoBytes;
 
-use super::{checksum, AcpiError, Result, Sdt, SdtHeader};
+use super::{checksum, AcpiError, Sdt, SdtHeader};
 
 /// Extended System Description Table (XSDT)
 ///
@@ -61,7 +63,11 @@ impl Sdt for Xsdt {
         std::mem::size_of::<SdtHeader>() + self.tables.len()
     }
 
-    fn write_to_guest<M: GuestMemory>(&mut self, mem: &M, address: GuestAddress) -> Result<()> {
+    fn write_to_guest<M: GuestMemory>(
+        &mut self,
+        mem: &M,
+        address: GuestAddress,
+    ) -> Result<(), AcpiError> {
         mem.write_slice(self.header.as_bytes(), address)?;
         let address = address
             .checked_add(size_of::<SdtHeader>() as u64)

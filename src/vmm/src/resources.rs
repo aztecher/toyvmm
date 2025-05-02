@@ -1,4 +1,4 @@
-// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Portions Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -10,7 +10,7 @@ use crate::vmm_config::boot_source::{
     BootConfig, BootSource, BootSourceConfig, BootSourceConfigError,
 };
 use crate::vmm_config::drive::{BlockDeviceBuilder, BlockDeviceConfig, DriveError};
-use crate::vmm_config::feature::{FeatureConfig, FeatureGateController};
+use crate::vmm_config::feature::{FeatureConfig, FeatureError, FeatureGateController};
 use crate::vmm_config::machine_config::{MachineConfig, VmConfig, VmConfigError};
 
 /// Errors associated with actions on configuring VM resources.
@@ -28,6 +28,9 @@ pub enum ResourcesError {
     /// Vm vcpus or memory configuration error.
     #[error("VM config error: {0}")]
     VmConfig(VmConfigError),
+    /// Features config error.
+    #[error("Features config error: {0}")]
+    FeatureGate(FeatureError),
 }
 
 /// Used for configuring a vmm from json.
@@ -118,8 +121,11 @@ impl VmResources {
     }
 
     /// Build feature gate controller
-    pub fn dispatch_feature_gate_controller(&self) -> FeatureGateController {
+    pub fn dispatch_feature_gate_controller(
+        &self,
+    ) -> Result<FeatureGateController, ResourcesError> {
         FeatureGateController::from_config(&self.feature_config)
+            .map_err(ResourcesError::FeatureGate)
     }
 
     ///

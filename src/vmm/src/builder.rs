@@ -1,4 +1,4 @@
-// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Portions Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -57,7 +57,7 @@ pub enum StartVmError {
     InsertCommandline(linux_loader::cmdline::Error),
     /// Failed to setup ACPI
     #[error("Failed to setup ACPI: {0}")]
-    SetupACPI(acpi_table::AcpiError),
+    SetupACPI(acpi_table::AcpiTableError),
     /// Failed to load cmdline
     #[error("Failed to load cmdline: {0}")]
     LoadCommandline(linux_loader::loader::Error),
@@ -83,17 +83,21 @@ pub enum StartVmError {
     /// Cannot open the block device backing file.
     #[error("Cannot open the block device backing file: {0}")]
     OpenBlockDevice(std::io::Error),
-    /// Clould not create a block device.
+    /// Could not create a block device.
     #[error("Clould not create a block device: {0}")]
     CreateBlockDevice(BlockError),
-    /// Clould not create a net device.
+    /// Could not create a net device.
     #[error("Clould not create a net device: {0}")]
     CreateNetDevice(NetError),
     /// Cannot initialize a MMIO Device or add a device to the MMIO Bus or cmdline.
     #[error("Cannot initialize a MMIO Device or add a device to the MMIO Bus or cmdline: {0}")]
     RegisterMmioDevice(MmioDeviceError),
+    /// Cannot initialize a epoll context for mmio device
     #[error("Cannot initialize a epoll context for mmio device: {0}")]
     EpollCtx(epoll::EpollContextError),
+    /// Could not dispatch feature gate controller
+    #[error("Could not dispatch feature gate controiller: {0}")]
+    DispathFeatureGate(resources::ResourcesError),
 }
 
 pub struct InitrdConfig {
@@ -535,8 +539,10 @@ pub fn build_and_boot_vm(mut vm_resources: resources::VmResources) -> Result<(),
         epoll::EpollContext::new(vcpu_exit_evt.as_raw_fd()).map_err(EpollCtx)?;
 
     // ACPI handling for feature gate
-    let fg_controller = vm_resources.dispatch_feature_gate_controller();
-    let enable_acpi = match fg_controller.feature_gate("acpi") {
+    let fg = vm_resources
+        .dispatch_feature_gate_controller()
+        .map_err(StartVmError::DispathFeatureGate)?;
+    let enable_acpi = match fg.feature_gate("acpi") {
         Some(acpi_feature) => acpi_feature.enable(),
         None => false,
     };
@@ -586,7 +592,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::{
         arch,
-        vmm_config::{boot_source, drive, machine_config},
+        vmm_config::{boot_source, drive, feature, machine_config},
     };
     use ::utils::tempfile::TempFile;
     use std::io::Write;
@@ -617,11 +623,13 @@ pub(crate) mod tests {
         vm_config: machine_config::VmConfig,
         boot_source: boot_source::BootSource,
         block: drive::BlockDeviceBuilder,
+        feature_config: Vec<feature::FeatureConfig>,
     ) -> resources::VmResources {
         resources::VmResources {
             vm_config,
             boot_source,
             block,
+            feature_config,
         }
     }
 
@@ -645,7 +653,11 @@ pub(crate) mod tests {
             config: boot_source_config,
             builder: Some(boot_config),
         };
-        make_test_vm_resources(vm_config, boot_source, block)
+        let feature_config = feature::FeatureConfig {
+            feature: "test".to_string(),
+            enable: false,
+        };
+        make_test_vm_resources(vm_config, boot_source, block, vec![feature_config])
     }
 
     fn default_vm_resources() -> resources::VmResources {
@@ -736,6 +748,7 @@ pub(crate) mod tests {
                 &mut vm_resources,
                 &mut epoll_context,
                 &mut mmio_device_manager,
+                false,
             )
             .is_ok());
             assert!(!cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
@@ -761,6 +774,7 @@ pub(crate) mod tests {
                 &mut vm_resources,
                 &mut epoll_context,
                 &mut mmio_device_manager,
+                false,
             )
             .is_ok());
             assert!(cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
@@ -791,6 +805,7 @@ pub(crate) mod tests {
                 &mut vm_resources,
                 &mut epoll_context,
                 &mut mmio_device_manager,
+                false,
             )
             .is_ok());
             assert!(cmdline_contains(vm_resources.cmdline(), "root=/dev/vda"));
@@ -817,6 +832,7 @@ pub(crate) mod tests {
             &mut vm_resources,
             &mut epoll_context,
             &mut mmio_device_manager,
+            false,
         )
         .is_ok());
     }

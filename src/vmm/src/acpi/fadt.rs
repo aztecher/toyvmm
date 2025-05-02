@@ -1,5 +1,7 @@
-// Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// Copyright 2023 Rivos, Inc.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
+//
+// Portions Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// Portions Copyright 2023 Rivos, Inc.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,7 +9,7 @@ use vm_memory::{Bytes, GuestAddress, GuestMemory};
 use zerocopy::little_endian::{U16, U32, U64};
 use zerocopy::{Immutable, IntoBytes};
 
-use super::{checksum, GenericAddressStructure, Result, Sdt, SdtHeader};
+use super::{checksum, AcpiError, GenericAddressStructure, Sdt, SdtHeader};
 
 pub const IAPC_BOOT_ARG_FLAGS_VGA_NOT_PRESENT: u16 = 2;
 pub const IAPC_BOOT_ARG_FLAGS_MSI_NOT_PRESENT: u16 = 3;
@@ -150,7 +152,11 @@ impl Sdt for Fadt {
         self.header.length.get().try_into().unwrap()
     }
 
-    fn write_to_guest<M: GuestMemory>(&mut self, mem: &M, address: GuestAddress) -> Result<()> {
+    fn write_to_guest<M: GuestMemory>(
+        &mut self,
+        mem: &M,
+        address: GuestAddress,
+    ) -> Result<(), AcpiError> {
         self.header.checksum = checksum(&[self.as_bytes()]);
         mem.write_slice(self.as_bytes(), address)?;
         Ok(())

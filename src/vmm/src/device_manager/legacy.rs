@@ -1,4 +1,4 @@
-// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::acpi::aml;
@@ -57,7 +57,7 @@ impl PortIoDeviceManager {
             .interrupt_evt()
             .try_clone()?;
         let com_evt_2_4 = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK)?);
-        /// TODO: KBD
+        // TODO: KBD
         Ok(PortIoDeviceManager {
             io_bus,
             stdio_serial,

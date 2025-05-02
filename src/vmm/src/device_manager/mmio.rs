@@ -1,4 +1,4 @@
-// Copyright 2023 aztecher, or its affiliates. All Rights Reserved.
+// Copyright 2025 aztecher, or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Portions Copyright 2017 The Chromium OS Authors. All rights reserved.
@@ -242,7 +242,7 @@ mod tests {
         let mut dm = MmioDeviceManager::new(gm, 0x1000, 0, 5);
         let dummy = Box::new(DummyDevice::new());
         let mut cmdline = linux_loader::cmdline::Cmdline::new(4096).unwrap();
-        assert!(dm.register_mmio(dummy, &mut cmdline).is_ok());
+        assert!(dm.register_mmio(dummy, &mut cmdline, false).is_ok());
         assert!(cmdline_contains(
             &cmdline,
             "virtio_mmio.device=4K@0x00000000:5"
